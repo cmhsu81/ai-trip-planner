@@ -1,0 +1,70 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  email        String   @unique
+  passwordHash String
+  createdAt    DateTime @default(now())
+  trips        Trip[]
+}
+
+model Trip {
+  id          String   @id @default(uuid())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title       String
+  destination String
+  days        Int
+  startDate   DateTime?
+  preferences Json?
+  notes       String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  itineraryDays ItineraryDay[]
+  chatMessages  ChatMessage[]
+}
+
+model ItineraryDay {
+  id        String   @id @default(uuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  dayNumber Int
+  date      DateTime?
+
+  items ItineraryItem[]
+
+  @@unique([tripId, dayNumber])
+}
+
+model ItineraryItem {
+  id                String       @id @default(uuid())
+  itineraryDayId    String
+  itineraryDay      ItineraryDay @relation(fields: [itineraryDayId], references: [id], onDelete: Cascade)
+  orderIndex        Int
+  time              String?
+  title             String
+  type              String
+  description       String?
+  location          String?
+  estimatedDuration String?
+  sourceNote        String?
+  confirmed         Boolean      @default(true)
+  createdAt         DateTime     @default(now())
+}
+
+model ChatMessage {
+  id        String   @id @default(uuid())
+  tripId    String
+  trip      Trip     @relation(fields: [tripId], references: [id], onDelete: Cascade)
+  role      String
+  content   String
+  createdAt DateTime @default(now())
+}
