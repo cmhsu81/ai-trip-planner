@@ -37,33 +37,42 @@ export default function TripsPage() {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-semibold text-slate-900">{t("trips.title")}</h1>
-        <Link href="/" className="text-sm bg-slate-900 text-white rounded px-4 py-2">
-          {t("trips.newTrip")}
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{t("trips.title")}</h1>
+        <Link
+          href="/"
+          className="text-sm bg-teal-600 hover:bg-teal-700 text-white rounded-full px-4 py-2 transition-colors shadow-sm"
+        >
+          + {t("trips.newTrip")}
         </Link>
       </div>
 
       {trips.length === 0 ? (
-        <p className="text-slate-500">{t("trips.empty")}</p>
+        <div className="border border-dashed border-slate-300 rounded-2xl p-12 text-center">
+          <p className="text-4xl mb-3">🗺️</p>
+          <p className="text-slate-400 text-sm">{t("trips.empty")}</p>
+        </div>
       ) : (
-        <ul className="space-y-3">
+        <ul className="grid gap-3 sm:grid-cols-2">
           {trips.map((trip) => (
             <li
               key={trip.id}
-              className="border border-slate-200 rounded-lg p-4 flex items-center justify-between"
+              className="border border-slate-200 rounded-2xl p-5 bg-white shadow-sm hover:shadow-md transition-shadow flex items-center justify-between gap-3"
             >
-              <div>
-                <p className="font-medium text-slate-900">{trip.title}</p>
-                <p className="text-sm text-slate-500">
+              <div className="min-w-0">
+                <p className="font-medium text-slate-900 truncate">{trip.title}</p>
+                <p className="text-sm text-slate-500 mt-0.5">
                   {trip.destination} · {trip.days} {t("planner.days")}
                   {trip.arrivalDate ? ` · ${trip.arrivalDate.slice(0, 10)}` : ""}
                 </p>
               </div>
-              <div className="flex gap-3 text-sm">
-                <Link href={`/trips/${trip.id}`} className="text-slate-900 underline">
+              <div className="flex gap-3 text-sm shrink-0">
+                <Link href={`/trips/${trip.id}`} className="text-teal-700 font-medium hover:underline">
                   {t("trips.viewButton")}
                 </Link>
-                <button onClick={() => handleDelete(trip.id)} className="text-red-500 underline">
+                <button
+                  onClick={() => handleDelete(trip.id)}
+                  className="text-red-400 hover:text-red-600 transition-colors"
+                >
                   {t("trips.deleteButton")}
                 </button>
               </div>

@@ -121,8 +121,8 @@ export default function HomePage() {
   return (
     <div className="space-y-8">
       <div>
-        <h1 className="text-2xl font-semibold text-slate-900">{t("planner.title")}</h1>
-        <p className="text-slate-500 mt-1">{t("planner.subtitle")}</p>
+        <h1 className="text-3xl font-bold text-slate-900 tracking-tight">{t("planner.title")}</h1>
+        <p className="text-slate-500 mt-2">{t("planner.subtitle")}</p>
       </div>
 
       <PlannerForm
@@ -134,11 +134,17 @@ export default function HomePage() {
 
       <AiSuggestions destination={formDestination} days={formDays} />
 
-      {error && <p className="text-sm text-red-600">{error}</p>}
+      {error && (
+        <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl px-4 py-3">
+          {error}
+        </p>
+      )}
 
       {feasibilityNotes.length > 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-lg p-4">
-          <h3 className="font-medium text-amber-800 mb-2">{t("planner.feasibility")}</h3>
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-5">
+          <h3 className="font-medium text-amber-800 mb-2 flex items-center gap-2">
+            <span>⚠️</span> {t("planner.feasibility")}
+          </h3>
           <ul className="list-disc list-inside text-sm text-amber-700 space-y-1">
             {feasibilityNotes.map((note, i) => (
               <li key={i}>{note}</li>

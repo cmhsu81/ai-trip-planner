@@ -55,14 +55,16 @@ export function AiSuggestions({ destination, days }: Props) {
   if (!destination.trim()) return null;
 
   return (
-    <div className="border border-slate-200 rounded-lg p-4">
+    <div className="border border-slate-200 rounded-2xl bg-white shadow-sm p-5">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="font-medium text-slate-800">{t("aiSuggestions.title")}</h3>
+        <h3 className="font-medium text-slate-800 flex items-center gap-2">
+          <span className="text-lg">💡</span> {t("aiSuggestions.title")}
+        </h3>
         {suggestions.length > 0 && (
           <button
             onClick={() => loadSuggestions(suggestions.map((s) => s.label))}
             disabled={loading}
-            className="text-xs text-slate-500 underline disabled:opacity-50"
+            className="text-xs text-teal-700 hover:text-teal-800 font-medium disabled:opacity-50"
           >
             {t("aiSuggestions.regenerate")}
           </button>
@@ -73,7 +75,7 @@ export function AiSuggestions({ destination, days }: Props) {
         <button
           onClick={() => loadSuggestions()}
           disabled={loading}
-          className="text-sm border border-slate-300 rounded-full px-4 py-2 disabled:opacity-50"
+          className="text-sm border border-teal-300 text-teal-700 bg-teal-50 hover:bg-teal-100 rounded-full px-4 py-2 disabled:opacity-50 transition-colors"
         >
           {loading ? t("common.loading") : t("aiSuggestions.cta")}
         </button>
@@ -83,7 +85,7 @@ export function AiSuggestions({ destination, days }: Props) {
             <button
               key={s.id}
               onClick={() => askSuggestion(s)}
-              className="text-sm rounded-full px-3 py-1.5 border border-slate-300 bg-white hover:bg-slate-50"
+              className="text-sm rounded-full px-3.5 py-1.5 border border-slate-200 bg-slate-50 hover:bg-teal-50 hover:border-teal-300 hover:text-teal-800 transition-colors"
             >
               {s.label}
             </button>

@@ -30,6 +30,10 @@ function daysBetween(from: string, to: string): number | null {
 
 const MAX_BUDGET = 5000;
 
+const inputClass =
+  "w-full border border-slate-300 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/60 focus:border-teal-500 transition-shadow";
+const labelClass = "block text-sm font-medium text-slate-700 mb-1.5";
+
 export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysChange }: Props) {
   const { t, locale } = useLocale();
 
@@ -119,60 +123,62 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-5 sm:grid-cols-2">
+    <form
+      onSubmit={handleSubmit}
+      className="grid gap-6 sm:grid-cols-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-6 sm:p-8"
+    >
       <div className="sm:col-span-2">
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.destination")}</label>
+        <label className={labelClass}>{t("planner.destination")}</label>
         <input
           required
           value={destination}
           onChange={(e) => setDestination(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
+          className={inputClass}
           placeholder="Tokyo, Japan"
         />
       </div>
 
       <div>
-        <label className="block text-sm text-slate-600 mb-1">
-          {t("planner.arrival")}
-        </label>
+        <label className={labelClass}>🛬 {t("planner.arrival")}</label>
         <div className="flex gap-2">
           <input
             type="date"
             value={arrivalDate}
             onChange={(e) => setArrivalDate(e.target.value)}
-            className="flex-1 border border-slate-300 rounded px-3 py-2"
+            className={`flex-1 ${inputClass}`}
           />
           <input
             type="time"
             value={arrivalTime}
             onChange={(e) => setArrivalTime(e.target.value)}
-            className="w-28 border border-slate-300 rounded px-3 py-2"
+            className={`w-28 ${inputClass}`}
           />
         </div>
       </div>
       <div>
-        <label className="block text-sm text-slate-600 mb-1">
-          {t("planner.departure")}
-        </label>
+        <label className={labelClass}>🛫 {t("planner.departure")}</label>
         <div className="flex gap-2">
           <input
             type="date"
             value={departureDate}
             onChange={(e) => setDepartureDate(e.target.value)}
-            className="flex-1 border border-slate-300 rounded px-3 py-2"
+            className={`flex-1 ${inputClass}`}
           />
           <input
             type="time"
             value={departureTime}
             onChange={(e) => setDepartureTime(e.target.value)}
-            className="w-28 border border-slate-300 rounded px-3 py-2"
+            className={`w-28 ${inputClass}`}
           />
         </div>
       </div>
 
       <div>
-        <label className="block text-sm text-slate-600 mb-1">
-          {t("planner.days")} {daysAreDerived && <span className="text-xs text-slate-400">({t("planner.daysAuto")})</span>}
+        <label className={labelClass}>
+          {t("planner.days")}{" "}
+          {daysAreDerived && (
+            <span className="text-xs font-normal text-teal-600">({t("planner.daysAuto")})</span>
+          )}
         </label>
         <input
           type="number"
@@ -182,22 +188,25 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
           disabled={daysAreDerived}
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="w-full border border-slate-300 rounded px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500"
+          className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`}
         />
       </div>
       <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.travelStyle")}</label>
+        <label className={labelClass}>{t("planner.travelStyle")}</label>
         <input
           value={travelStyle}
           onChange={(e) => setTravelStyle(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
+          className={inputClass}
           placeholder="relaxed / packed / family-friendly"
         />
       </div>
 
-      <div className="sm:col-span-2">
-        <label className="block text-sm text-slate-600 mb-1">
-          {t("planner.budget")}: <span className="font-medium text-slate-900">${budgetAmount} USD / {t("planner.perPerson")}</span>
+      <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4 border border-slate-100">
+        <label className={labelClass}>
+          {t("planner.budget")}:{" "}
+          <span className="font-semibold text-teal-700">
+            ${budgetAmount} USD / {t("planner.perPerson")}
+          </span>
         </label>
         <input
           type="range"
@@ -206,7 +215,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
           step={50}
           value={budgetAmount}
           onChange={(e) => setBudgetAmount(Number(e.target.value))}
-          className="w-full accent-slate-900"
+          className="w-full accent-teal-600"
         />
         <div className="flex justify-between text-xs text-slate-400">
           <span>$0</span>
@@ -215,8 +224,13 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
       </div>
 
       <div className="sm:col-span-2">
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.interests")}</label>
-        {loadingInterests && <p className="text-xs text-slate-400">{t("planner.interestsLoading")}</p>}
+        <label className={labelClass}>{t("planner.interests")}</label>
+        {loadingInterests && (
+          <p className="text-xs text-slate-400 flex items-center gap-1.5">
+            <span className="h-1.5 w-1.5 rounded-full bg-teal-500 animate-pulse" />
+            {t("planner.interestsLoading")}
+          </p>
+        )}
         {!loadingInterests && suggestedInterests.length === 0 && (
           <p className="text-xs text-slate-400">{t("planner.interestsHint")}</p>
         )}
@@ -229,10 +243,10 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
                   type="button"
                   key={interest}
                   onClick={() => toggleInterest(interest)}
-                  className={`text-sm rounded-full px-3 py-1 border ${
+                  className={`text-sm rounded-full px-3.5 py-1.5 border transition-colors ${
                     selected
-                      ? "bg-slate-900 text-white border-slate-900"
-                      : "bg-white text-slate-600 border-slate-300"
+                      ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                      : "bg-white text-slate-600 border-slate-300 hover:border-teal-400"
                   }`}
                 >
                   {interest}
@@ -244,27 +258,19 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
       </div>
 
       <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.mustSee")}</label>
-        <input
-          value={mustSee}
-          onChange={(e) => setMustSee(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
-        />
+        <label className={labelClass}>{t("planner.mustSee")}</label>
+        <input value={mustSee} onChange={(e) => setMustSee(e.target.value)} className={inputClass} />
       </div>
       <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.mustEat")}</label>
-        <input
-          value={mustEat}
-          onChange={(e) => setMustEat(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
-        />
+        <label className={labelClass}>{t("planner.mustEat")}</label>
+        <input value={mustEat} onChange={(e) => setMustEat(e.target.value)} className={inputClass} />
       </div>
 
       <div className="sm:col-span-2">
         <button
           type="submit"
           disabled={submitting}
-          className="w-full bg-slate-900 text-white rounded py-2 disabled:opacity-50"
+          className="w-full bg-teal-600 text-white font-medium rounded-lg py-3 hover:bg-teal-700 transition-colors disabled:opacity-50 shadow-sm"
         >
           {submitting ? t("planner.generating") : t("planner.generate")}
         </button>
