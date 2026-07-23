@@ -16,7 +16,8 @@ export async function listTrips(req: AuthRequest, res: Response, next: NextFunct
         title: true,
         destination: true,
         days: true,
-        startDate: true,
+        arrivalDate: true,
+        departureDate: true,
         createdAt: true,
       },
     });

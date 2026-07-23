@@ -7,22 +7,28 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { api } from "@/lib/api";
 import { ItineraryView } from "@/components/ItineraryView";
 import { ChatPanel } from "@/components/ChatPanel";
-import { ChatMessage, ItineraryDay, ItineraryItem, Trip } from "@/types";
+import { DisplayChatMessage, ItineraryDay, ItineraryDraft, ItineraryItem, Trip } from "@/types";
 
 interface ChatResponse {
+  messageId: string;
   reply: string;
+  isChangeRequest: boolean;
+  proposedItinerary: ItineraryDraft | null;
+}
+
+interface ChatApplyResponse {
   trip: Trip;
 }
 
 export default function TripDetailPage() {
   const params = useParams<{ id: string }>();
   const { user, loading: authLoading } = useAuth();
-  const { t } = useLocale();
+  const { t, locale } = useLocale();
   const router = useRouter();
 
   const [trip, setTrip] = useState<Trip | null>(null);
   const [itineraryDays, setItineraryDays] = useState<ItineraryDay[]>([]);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [messages, setMessages] = useState<DisplayChatMessage[]>([]);
   const [loading, setLoading] = useState(true);
   const [pendingChatMessage, setPendingChatMessage] = useState<string | undefined>(undefined);
 
@@ -48,11 +54,34 @@ export default function TripDetailPage() {
       ...prev,
       { id: `local-${Date.now()}`, role: "user", content: message, createdAt: new Date().toISOString() },
     ]);
-    const data = await api.post<ChatResponse>("/ai/chat", { tripId: trip.id, message });
+    const data = await api.post<ChatResponse>("/ai/chat", { tripId: trip.id, message, locale });
+    setMessages((prev) => [
+      ...prev,
+      {
+        id: data.messageId,
+        role: "assistant",
+        content: data.reply,
+        createdAt: new Date().toISOString(),
+        isChangeRequest: data.isChangeRequest,
+        proposedItinerary: data.proposedItinerary,
+      },
+    ]);
+    setPendingChatMessage(undefined);
+  }
+
+  async function handleAcceptChange(message: DisplayChatMessage) {
+    if (!trip || !message.proposedItinerary) return;
+    const data = await api.post<ChatApplyResponse>("/ai/chat/apply", {
+      tripId: trip.id,
+      proposedItinerary: message.proposedItinerary,
+    });
     setTrip(data.trip);
     setItineraryDays(data.trip.itineraryDays ?? []);
-    setMessages(data.trip.chatMessages ?? []);
-    setPendingChatMessage(undefined);
+    setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, resolution: "applied" } : m)));
+  }
+
+  function handleRejectChange(message: DisplayChatMessage) {
+    setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, resolution: "dismissed" } : m)));
   }
 
   function handleAskAiToReplace(item: ItineraryItem, dayNumber: number) {
@@ -83,6 +112,8 @@ export default function TripDetailPage() {
         <ChatPanel
           messages={messages}
           onSend={handleSendChat}
+          onAccept={handleAcceptChange}
+          onReject={handleRejectChange}
           pendingMessage={pendingChatMessage}
         />
       </div>

@@ -1,12 +1,15 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
+import { api } from "@/lib/api";
 import { GenerateTripInput } from "@/types";
 
 interface Props {
   onSubmit: (input: GenerateTripInput) => Promise<void>;
   submitting: boolean;
+  onDestinationChange?: (destination: string) => void;
+  onDaysChange?: (days: number) => void;
 }
 
 function splitList(value: string): string[] | undefined {
@@ -17,33 +20,106 @@ function splitList(value: string): string[] | undefined {
   return items.length > 0 ? items : undefined;
 }
 
-export function PlannerForm({ onSubmit, submitting }: Props) {
-  const { t } = useLocale();
+function daysBetween(from: string, to: string): number | null {
+  const start = new Date(from);
+  const end = new Date(to);
+  if (Number.isNaN(start.getTime()) || Number.isNaN(end.getTime())) return null;
+  const diff = Math.round((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  return diff >= 0 ? diff + 1 : null;
+}
+
+const MAX_BUDGET = 5000;
+
+export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysChange }: Props) {
+  const { t, locale } = useLocale();
+
   const [destination, setDestination] = useState("");
   const [days, setDays] = useState(3);
-  const [startDate, setStartDate] = useState("");
-  const [interests, setInterests] = useState("");
+
+  useEffect(() => {
+    onDestinationChange?.(destination);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [destination]);
+
+  useEffect(() => {
+    onDaysChange?.(days);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [days]);
+  const [arrivalDate, setArrivalDate] = useState("");
+  const [arrivalTime, setArrivalTime] = useState("10:00");
+  const [departureDate, setDepartureDate] = useState("");
+  const [departureTime, setDepartureTime] = useState("18:00");
   const [mustSee, setMustSee] = useState("");
   const [mustEat, setMustEat] = useState("");
   const [travelStyle, setTravelStyle] = useState("");
-  const [budget, setBudget] = useState("");
+  const [budgetAmount, setBudgetAmount] = useState(500);
+
+  const [suggestedInterests, setSuggestedInterests] = useState<string[]>([]);
+  const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
+  const [loadingInterests, setLoadingInterests] = useState(false);
+
+  const daysAreDerived = Boolean(arrivalDate && departureDate);
+
+  useEffect(() => {
+    // derive days from the date range whenever it changes
+    if (arrivalDate && departureDate) {
+      const computed = daysBetween(arrivalDate, departureDate);
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      if (computed) setDays(computed);
+    }
+  }, [arrivalDate, departureDate]);
+
+  useEffect(() => {
+    const trimmed = destination.trim();
+    if (trimmed.length < 2) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setSuggestedInterests([]);
+      return;
+    }
+    const handle = setTimeout(async () => {
+      setLoadingInterests(true);
+      try {
+        const data = await api.post<{ suggestions: string[] }>("/ai/suggest-interests", {
+          destination: trimmed,
+          locale,
+        });
+        setSuggestedInterests(data.suggestions);
+        setSelectedInterests([]);
+      } catch {
+        setSuggestedInterests([]);
+      } finally {
+        setLoadingInterests(false);
+      }
+    }, 600);
+    return () => clearTimeout(handle);
+  }, [destination, locale]);
+
+  function toggleInterest(interest: string) {
+    setSelectedInterests((prev) =>
+      prev.includes(interest) ? prev.filter((i) => i !== interest) : [...prev, interest]
+    );
+  }
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
     await onSubmit({
       destination,
       days,
-      startDate: startDate || undefined,
-      interests: splitList(interests),
+      arrivalDate: arrivalDate || undefined,
+      arrivalTime: arrivalTime || "10:00",
+      departureDate: departureDate || undefined,
+      departureTime: departureTime || "18:00",
+      interests: selectedInterests.length > 0 ? selectedInterests : undefined,
       mustSeeAttractions: splitList(mustSee),
       mustEatRestaurants: splitList(mustEat),
       travelStyle: travelStyle || undefined,
-      budget: budget || undefined,
+      budget: `$${budgetAmount} USD per person`,
+      locale,
     });
   }
 
   return (
-    <form onSubmit={handleSubmit} className="grid gap-4 sm:grid-cols-2">
+    <form onSubmit={handleSubmit} className="grid gap-5 sm:grid-cols-2">
       <div className="sm:col-span-2">
         <label className="block text-sm text-slate-600 mb-1">{t("planner.destination")}</label>
         <input
@@ -54,36 +130,119 @@ export function PlannerForm({ onSubmit, submitting }: Props) {
           placeholder="Tokyo, Japan"
         />
       </div>
+
       <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.days")}</label>
+        <label className="block text-sm text-slate-600 mb-1">
+          {t("planner.arrival")}
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={arrivalDate}
+            onChange={(e) => setArrivalDate(e.target.value)}
+            className="flex-1 border border-slate-300 rounded px-3 py-2"
+          />
+          <input
+            type="time"
+            value={arrivalTime}
+            onChange={(e) => setArrivalTime(e.target.value)}
+            className="w-28 border border-slate-300 rounded px-3 py-2"
+          />
+        </div>
+      </div>
+      <div>
+        <label className="block text-sm text-slate-600 mb-1">
+          {t("planner.departure")}
+        </label>
+        <div className="flex gap-2">
+          <input
+            type="date"
+            value={departureDate}
+            onChange={(e) => setDepartureDate(e.target.value)}
+            className="flex-1 border border-slate-300 rounded px-3 py-2"
+          />
+          <input
+            type="time"
+            value={departureTime}
+            onChange={(e) => setDepartureTime(e.target.value)}
+            className="w-28 border border-slate-300 rounded px-3 py-2"
+          />
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-sm text-slate-600 mb-1">
+          {t("planner.days")} {daysAreDerived && <span className="text-xs text-slate-400">({t("planner.daysAuto")})</span>}
+        </label>
         <input
           type="number"
           min={1}
           max={30}
           required
+          disabled={daysAreDerived}
           value={days}
           onChange={(e) => setDays(Number(e.target.value))}
-          className="w-full border border-slate-300 rounded px-3 py-2"
+          className="w-full border border-slate-300 rounded px-3 py-2 disabled:bg-slate-100 disabled:text-slate-500"
         />
       </div>
       <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.startDate")}</label>
+        <label className="block text-sm text-slate-600 mb-1">{t("planner.travelStyle")}</label>
         <input
-          type="date"
-          value={startDate}
-          onChange={(e) => setStartDate(e.target.value)}
+          value={travelStyle}
+          onChange={(e) => setTravelStyle(e.target.value)}
           className="w-full border border-slate-300 rounded px-3 py-2"
+          placeholder="relaxed / packed / family-friendly"
         />
       </div>
+
+      <div className="sm:col-span-2">
+        <label className="block text-sm text-slate-600 mb-1">
+          {t("planner.budget")}: <span className="font-medium text-slate-900">${budgetAmount} USD / {t("planner.perPerson")}</span>
+        </label>
+        <input
+          type="range"
+          min={0}
+          max={MAX_BUDGET}
+          step={50}
+          value={budgetAmount}
+          onChange={(e) => setBudgetAmount(Number(e.target.value))}
+          className="w-full accent-slate-900"
+        />
+        <div className="flex justify-between text-xs text-slate-400">
+          <span>$0</span>
+          <span>${MAX_BUDGET}+</span>
+        </div>
+      </div>
+
       <div className="sm:col-span-2">
         <label className="block text-sm text-slate-600 mb-1">{t("planner.interests")}</label>
-        <input
-          value={interests}
-          onChange={(e) => setInterests(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
-          placeholder="food, hiking, museums"
-        />
+        {loadingInterests && <p className="text-xs text-slate-400">{t("planner.interestsLoading")}</p>}
+        {!loadingInterests && suggestedInterests.length === 0 && (
+          <p className="text-xs text-slate-400">{t("planner.interestsHint")}</p>
+        )}
+        {suggestedInterests.length > 0 && (
+          <div className="flex flex-wrap gap-2 mt-1">
+            {suggestedInterests.map((interest) => {
+              const selected = selectedInterests.includes(interest);
+              return (
+                <button
+                  type="button"
+                  key={interest}
+                  onClick={() => toggleInterest(interest)}
+                  className={`text-sm rounded-full px-3 py-1 border ${
+                    selected
+                      ? "bg-slate-900 text-white border-slate-900"
+                      : "bg-white text-slate-600 border-slate-300"
+                  }`}
+                >
+                  {interest}
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
+
       <div>
         <label className="block text-sm text-slate-600 mb-1">{t("planner.mustSee")}</label>
         <input
@@ -100,24 +259,7 @@ export function PlannerForm({ onSubmit, submitting }: Props) {
           className="w-full border border-slate-300 rounded px-3 py-2"
         />
       </div>
-      <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.travelStyle")}</label>
-        <input
-          value={travelStyle}
-          onChange={(e) => setTravelStyle(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
-          placeholder="relaxed / packed / family-friendly"
-        />
-      </div>
-      <div>
-        <label className="block text-sm text-slate-600 mb-1">{t("planner.budget")}</label>
-        <input
-          value={budget}
-          onChange={(e) => setBudget(e.target.value)}
-          className="w-full border border-slate-300 rounded px-3 py-2"
-          placeholder="budget / mid-range / luxury"
-        />
-      </div>
+
       <div className="sm:col-span-2">
         <button
           type="submit"

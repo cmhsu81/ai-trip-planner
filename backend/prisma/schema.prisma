@@ -16,17 +16,20 @@ model User {
 }
 
 model Trip {
-  id          String   @id @default(uuid())
-  userId      String
-  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  title       String
-  destination String
-  days        Int
-  startDate   DateTime?
-  preferences Json?
-  notes       String?
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
+  id             String    @id @default(uuid())
+  userId         String
+  user           User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title          String
+  destination    String
+  days           Int
+  arrivalDate    DateTime?
+  arrivalTime    String    @default("10:00")
+  departureDate  DateTime?
+  departureTime  String    @default("18:00")
+  preferences    Json?
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
 
   itineraryDays ItineraryDay[]
   chatMessages  ChatMessage[]

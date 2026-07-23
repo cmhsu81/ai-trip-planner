@@ -1,6 +1,6 @@
 import Anthropic from "@anthropic-ai/sdk";
 import { env } from "../config/env";
-import { ItineraryDraft } from "../types";
+import { ItineraryDraft, Locale } from "../types";
 
 const client = new Anthropic({ apiKey: env.anthropicApiKey });
 
@@ -9,6 +9,16 @@ const WEB_SEARCH_TOOL: Anthropic.Messages.WebSearchTool20250305 = {
   name: "web_search",
   max_uses: 8,
 };
+
+function languageName(locale: Locale): string {
+  return locale === "zh" ? "Traditional Chinese (繁體中文)" : "English";
+}
+
+function languageInstruction(locale: Locale): string {
+  return `Write all human-readable text (summary, feasibilityNotes, descriptions, sourceNote, replies, answers, labels) in ${languageName(
+    locale
+  )}. Place names / proper nouns may stay in their common form.`;
+}
 
 const ITINERARY_JSON_SHAPE = `{
   "destination": string,
@@ -33,14 +43,18 @@ const ITINERARY_JSON_SHAPE = `{
   ]
 }`;
 
-function buildSystemPrompt(): string {
+function buildSystemPrompt(locale: Locale): string {
   return `You are an expert AI travel planner. You have access to a web_search tool — use it to look up:
 - Currently popular attractions and restaurants (consider Google Maps, TripAdvisor, and Yelp style ratings/reviews when reasoning)
 - News from the last 1-2 years relevant to the destination (safety, closures, new attractions, events, festivals)
 - Expected weather/season conditions for the travel dates
 - Local events or holidays that could affect the plan
 
-Use search results to ground your recommendations in current, real information rather than guessing. Judge feasibility: flag anything unrealistic (too many stops in one day, conflicting travel times, seasonal closures, extreme weather) inside "feasibilityNotes".
+Use search results to ground your recommendations in current, real information rather than guessing. Judge feasibility: flag anything unrealistic (too many stops in one day, conflicting travel times, seasonal closures, extreme weather, arriving/leaving too late/early for planned activities) inside "feasibilityNotes".
+
+The first day's plan must start no earlier than the traveler's arrival time, and the last day's plan must end in time for their departure. ${languageInstruction(
+    locale
+  )}
 
 After researching, respond with ONLY a single JSON object (no markdown fences, no commentary before or after) matching exactly this shape:
 ${ITINERARY_JSON_SHAPE}`;
@@ -57,6 +71,17 @@ function extractJson(text: string): unknown {
   return JSON.parse(candidate.slice(start, end + 1));
 }
 
+function extractJsonArray(text: string): unknown[] {
+  const fenced = text.match(/```(?:json)?\s*([\s\S]*?)```/i);
+  const candidate = fenced ? fenced[1] : text;
+  const start = candidate.indexOf("[");
+  const end = candidate.lastIndexOf("]");
+  if (start === -1 || end === -1) {
+    throw new Error("Claude response did not contain a JSON array");
+  }
+  return JSON.parse(candidate.slice(start, end + 1));
+}
+
 function collectText(content: Anthropic.Messages.ContentBlock[]): string {
   return content
     .filter((block): block is Anthropic.Messages.TextBlock => block.type === "text")
@@ -67,19 +92,32 @@ function collectText(content: Anthropic.Messages.ContentBlock[]): string {
 export interface GenerateItineraryParams {
   destination: string;
   days: number;
-  startDate?: string;
+  arrivalDate?: string;
+  arrivalTime: string;
+  departureDate?: string;
+  departureTime: string;
   interests?: string[];
   mustSeeAttractions?: string[];
   mustEatRestaurants?: string[];
   travelStyle?: string;
   budget?: string;
+  locale: Locale;
 }
 
 export async function generateItinerary(
   params: GenerateItineraryParams
 ): Promise<ItineraryDraft> {
   const userPrompt = `Plan a ${params.days}-day trip to ${params.destination}.
-${params.startDate ? `Start date: ${params.startDate}` : "No specific start date given — use relative day numbers."}
+${
+  params.arrivalDate
+    ? `Arrival: ${params.arrivalDate} at ${params.arrivalTime}`
+    : `Arrival time each first day: ${params.arrivalTime} (no specific arrival date given — use relative day numbers)`
+}
+${
+  params.departureDate
+    ? `Departure: ${params.departureDate} at ${params.departureTime}`
+    : `Departure time on the last day: ${params.departureTime}`
+}
 Interests / trip type: ${params.interests?.join(", ") || "no strong preference, suggest well-rounded popular options"}
 Must-include attractions: ${params.mustSeeAttractions?.join(", ") || "none specified"}
 Must-include restaurants/food: ${params.mustEatRestaurants?.join(", ") || "none specified"}
@@ -91,7 +129,7 @@ Research current top-rated attractions/restaurants and recent (last 1-2 years) r
   const response = await client.messages.create({
     model: env.anthropicModel,
     max_tokens: 8000,
-    system: buildSystemPrompt(),
+    system: buildSystemPrompt(params.locale),
     tools: [WEB_SEARCH_TOOL],
     messages: [{ role: "user", content: userPrompt }],
   });
@@ -105,26 +143,31 @@ export interface ChatRefineParams {
   currentItinerary: ItineraryDraft;
   conversationHistory: { role: "user" | "assistant"; content: string }[];
   userMessage: string;
+  locale: Locale;
 }
 
 export interface ChatRefineResult {
   reply: string;
-  updatedItinerary: ItineraryDraft;
+  isChangeRequest: boolean;
+  updatedItinerary?: ItineraryDraft;
 }
 
 export async function chatRefine(params: ChatRefineParams): Promise<ChatRefineResult> {
-  const system = `You are an AI travel planning assistant helping a user refine an existing itinerary.
+  const system = `You are an AI travel planning assistant helping a user with an existing itinerary.
 The current itinerary (JSON) is:
 ${JSON.stringify(params.currentItinerary, null, 2)}
 
-The user may ask you to delete an item, replace an item with an alternative (use web_search if you need fresh recommendations), extend/shorten time spent somewhere, reorder the day, or add something new. Use web_search when the request needs current information (e.g. "find another restaurant nearby", "what's a good rainy-day alternative").
+First decide whether the user's message is:
+(a) a QUESTION — they just want information (e.g. "what's good to eat at XXX", "how's the weather in March") — answer it in "reply" and set "isChangeRequest" to false. Do NOT include "updatedItinerary".
+(b) a CHANGE REQUEST — they want you to modify the itinerary (delete/replace/extend/reorder/add an item). Use web_search if you need fresh recommendations. Set "isChangeRequest" to true, put a short explanation of the proposed change in "reply", and include the FULL updated itinerary in "updatedItinerary" (this is only a proposal — it will not be applied unless the user confirms it).
 
 Respond with ONLY a single JSON object (no markdown fences) of this shape:
 {
-  "reply": string,              // a short conversational reply explaining what you changed, in the same language the user wrote in
-  "updatedItinerary": ${ITINERARY_JSON_SHAPE}
+  "reply": string,
+  "isChangeRequest": boolean,
+  "updatedItinerary": ${ITINERARY_JSON_SHAPE}  // omit entirely (or set to null) when isChangeRequest is false
 }
-If nothing about the itinerary needs to change, return "updatedItinerary" unchanged.`;
+${languageInstruction(params.locale)}`;
 
   const messages: Anthropic.Messages.MessageParam[] = [
     ...params.conversationHistory.map((m) => ({ role: m.role, content: m.content })),
@@ -140,6 +183,80 @@ If nothing about the itinerary needs to change, return "updatedItinerary" unchan
   });
 
   const text = collectText(response.content);
-  const parsed = extractJson(text) as ChatRefineResult;
+  const parsed = extractJson(text) as ChatRefineResult & { updatedItinerary?: ItineraryDraft | null };
+  return {
+    reply: parsed.reply,
+    isChangeRequest: Boolean(parsed.isChangeRequest && parsed.updatedItinerary),
+    updatedItinerary: parsed.isChangeRequest && parsed.updatedItinerary ? parsed.updatedItinerary : undefined,
+  };
+}
+
+export async function suggestInterests(destination: string, locale: Locale): Promise<string[]> {
+  const system = `You suggest short trip-interest tags for a travel planner UI. Given a destination, respond with ONLY a JSON array of 5 to 10 short strings (2-4 words each) naming popular activity/interest categories specifically relevant to that destination (e.g. for a place with mountains: "hiking", "hot spring", "national park"; for a coastal city: "seafood", "beaches", "diving"). No markdown fences, no commentary. ${languageInstruction(
+    locale
+  )}`;
+
+  const response = await client.messages.create({
+    model: env.anthropicModel,
+    max_tokens: 500,
+    system,
+    messages: [{ role: "user", content: `Destination: ${destination}` }],
+  });
+
+  const text = collectText(response.content);
+  const parsed = extractJsonArray(text);
+  return parsed.filter((v): v is string => typeof v === "string");
+}
+
+export interface QuickSuggestion {
+  id: string;
+  label: string;
+  question: string;
+}
+
+export async function quickSuggestions(
+  destination: string,
+  days: number,
+  locale: Locale,
+  exclude: string[] = []
+): Promise<QuickSuggestion[]> {
+  const system = `You suggest 5 short "quick question" buttons for a trip-planning UI about a specific destination. Each has a short button "label" (a few words) and a fuller "question" that will be sent to a research assistant if clicked (e.g. label "鄰近城市" / question "What nearby cities or day-trip destinations are worth visiting from <destination>?"). Cover a useful variety: nearby cities/day trips, top-rated attractions (e.g. TripAdvisor-style), weather forecast/best season, local customs or etiquette, safety tips, packing tips, transportation options, must-try food, budget tips, etc. — pick 5 that are most useful for this destination.
+${exclude.length > 0 ? `Do NOT repeat these previously shown labels: ${exclude.join(", ")}. Pick 5 different ones.` : ""}
+Respond with ONLY a JSON array of exactly 5 objects: [{ "id": string, "label": string, "question": string }, ...]. No markdown fences, no commentary. ${languageInstruction(
+    locale
+  )}`;
+
+  const response = await client.messages.create({
+    model: env.anthropicModel,
+    max_tokens: 800,
+    system,
+    messages: [{ role: "user", content: `Destination: ${destination}, trip length: ${days} days` }],
+  });
+
+  const text = collectText(response.content);
+  const parsed = extractJsonArray(text) as QuickSuggestion[];
   return parsed;
+}
+
+export async function quickAnswer(
+  destination: string,
+  days: number,
+  question: string,
+  locale: Locale
+): Promise<string> {
+  const system = `You are a helpful travel research assistant. Use web_search to answer the user's question about their destination with current, accurate information. Keep the answer concise (a short paragraph or a short bullet list). ${languageInstruction(
+    locale
+  )}`;
+
+  const response = await client.messages.create({
+    model: env.anthropicModel,
+    max_tokens: 1200,
+    system,
+    tools: [WEB_SEARCH_TOOL],
+    messages: [
+      { role: "user", content: `Destination: ${destination}, trip length: ${days} days.\nQuestion: ${question}` },
+    ],
+  });
+
+  return collectText(response.content).trim();
 }

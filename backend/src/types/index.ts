@@ -5,6 +5,8 @@ export interface AuthRequest extends Request {
   user?: JwtPayload;
 }
 
+export type Locale = "en" | "zh";
+
 export type ItineraryItemType =
   | "attraction"
   | "restaurant"

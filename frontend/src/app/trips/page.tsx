@@ -56,7 +56,7 @@ export default function TripsPage() {
                 <p className="font-medium text-slate-900">{trip.title}</p>
                 <p className="text-sm text-slate-500">
                   {trip.destination} · {trip.days} {t("planner.days")}
-                  {trip.startDate ? ` · ${trip.startDate.slice(0, 10)}` : ""}
+                  {trip.arrivalDate ? ` · ${trip.arrivalDate.slice(0, 10)}` : ""}
                 </p>
               </div>
               <div className="flex gap-3 text-sm">
