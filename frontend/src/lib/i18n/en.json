@@ -45,7 +45,9 @@
   "planner.perPerson": "person",
   "planner.generate": "Generate Itinerary",
   "planner.generating": "AI is researching and planning your trip...",
+  "planner.generatingOverlay": "Generating your itinerary...",
   "planner.feasibility": "AI Feasibility Notes",
+  "planner.dateTimeError": "Departure time must be after arrival time",
 
   "aiSuggestions.title": "Curious about this destination?",
   "aiSuggestions.cta": "Get AI suggestions",

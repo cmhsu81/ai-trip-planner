@@ -63,6 +63,18 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
   const [loadingInterests, setLoadingInterests] = useState(false);
 
   const daysAreDerived = Boolean(arrivalDate && departureDate);
+  const sameDayInvalidTime = Boolean(
+    arrivalDate && departureDate && arrivalDate === departureDate && departureTime <= arrivalTime
+  );
+
+  useEffect(() => {
+    // a previously picked departure date can become invalid if the arrival
+    // date moves past it — clear it rather than silently keeping a bad range
+    if (departureDate && arrivalDate && departureDate < arrivalDate) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
+      setDepartureDate("");
+    }
+  }, [arrivalDate, departureDate]);
 
   useEffect(() => {
     // derive days from the date range whenever it changes
@@ -106,6 +118,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault();
+    if (sameDayInvalidTime) return;
     await onSubmit({
       destination,
       days,
@@ -161,16 +174,20 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
           <input
             type="date"
             value={departureDate}
+            min={arrivalDate || undefined}
             onChange={(e) => setDepartureDate(e.target.value)}
-            className={`flex-1 ${inputClass}`}
+            className={`flex-1 ${inputClass} ${sameDayInvalidTime ? "border-red-400 focus:ring-red-400/60 focus:border-red-400" : ""}`}
           />
           <input
             type="time"
             value={departureTime}
             onChange={(e) => setDepartureTime(e.target.value)}
-            className={`w-28 ${inputClass}`}
+            className={`w-28 ${inputClass} ${sameDayInvalidTime ? "border-red-400 focus:ring-red-400/60 focus:border-red-400" : ""}`}
           />
         </div>
+        {sameDayInvalidTime && (
+          <p className="text-xs text-red-600 mt-1.5">{t("planner.dateTimeError")}</p>
+        )}
       </div>
 
       <div>
@@ -269,7 +286,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
       <div className="sm:col-span-2">
         <button
           type="submit"
-          disabled={submitting}
+          disabled={submitting || sameDayInvalidTime}
           className="w-full bg-teal-600 text-white font-medium rounded-lg py-3 hover:bg-teal-700 transition-colors disabled:opacity-50 shadow-sm"
         >
           {submitting ? t("planner.generating") : t("planner.generate")}

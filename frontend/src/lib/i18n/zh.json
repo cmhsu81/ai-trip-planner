@@ -45,7 +45,9 @@
   "planner.perPerson": "人",
   "planner.generate": "產生行程",
   "planner.generating": "AI 正在搜尋資料並規劃行程...",
+  "planner.generatingOverlay": "行程表生成中...",
   "planner.feasibility": "AI 可行性評估",
+  "planner.dateTimeError": "離開時間必須晚於抵達時間",
 
   "aiSuggestions.title": "想多了解這個目的地嗎？",
   "aiSuggestions.cta": "取得 AI 建議",

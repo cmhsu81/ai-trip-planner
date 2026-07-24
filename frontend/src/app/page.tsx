@@ -9,6 +9,7 @@ import { ItineraryView } from "@/components/ItineraryView";
 import { ChatPanel } from "@/components/ChatPanel";
 import { AiSuggestions } from "@/components/AiSuggestions";
 import { LandingPage } from "@/components/LandingPage";
+import { GeneratingOverlay } from "@/components/GeneratingOverlay";
 import {
   DisplayChatMessage,
   GenerateTripInput,
@@ -125,12 +126,23 @@ export default function HomePage() {
         <p className="text-slate-500 mt-2">{t("planner.subtitle")}</p>
       </div>
 
-      <PlannerForm
-        onSubmit={handleGenerate}
-        submitting={submitting}
-        onDestinationChange={setFormDestination}
-        onDaysChange={setFormDays}
-      />
+      <div className="relative">
+        <div
+          className={
+            submitting
+              ? "opacity-40 pointer-events-none select-none transition-opacity"
+              : "transition-opacity"
+          }
+        >
+          <PlannerForm
+            onSubmit={handleGenerate}
+            submitting={submitting}
+            onDestinationChange={setFormDestination}
+            onDaysChange={setFormDays}
+          />
+        </div>
+        {submitting && <GeneratingOverlay text={t("planner.generatingOverlay")} />}
+      </div>
 
       <AiSuggestions destination={formDestination} days={formDays} />
 

@@ -26,3 +26,28 @@ input[type="range"] {
   background: #99f6e4;
   color: #0f172a;
 }
+
+@keyframes walk-across {
+  0% {
+    left: -8%;
+    transform: translateY(0);
+  }
+  25% {
+    transform: translateY(-6px);
+  }
+  50% {
+    transform: translateY(0);
+  }
+  75% {
+    transform: translateY(-6px);
+  }
+  100% {
+    left: 100%;
+    transform: translateY(0);
+  }
+}
+
+.animate-walk-across {
+  animation: walk-across 1.6s linear infinite;
+}
+
