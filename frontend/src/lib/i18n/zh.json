@@ -38,6 +38,7 @@
   "planner.interests": "興趣",
   "planner.interestsHint": "輸入目的地後，AI 會建議相關興趣選項",
   "planner.interestsLoading": "正在為此目的地產生興趣建議...",
+  "planner.interestsError": "無法取得興趣建議，你仍可以直接產生行程。",
   "planner.mustSee": "指定景點（選填）",
   "planner.mustEat": "指定餐廳（選填）",
   "planner.travelStyle": "旅遊風格",
@@ -52,6 +53,7 @@
   "aiSuggestions.title": "想多了解這個目的地嗎？",
   "aiSuggestions.cta": "取得 AI 建議",
   "aiSuggestions.regenerate": "🔄 換一批建議",
+  "aiSuggestions.error": "取得資料時發生錯誤，請再試一次。",
 
   "chat.title": "與 AI 對話調整行程",
   "chat.placeholder": "例如：把第二天的午餐換成便宜一點的，或是把博物館停留時間延長到 2 小時",

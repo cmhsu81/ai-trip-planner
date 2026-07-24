@@ -15,13 +15,16 @@ export function AiSuggestions({ destination, days }: Props) {
   const { t, locale } = useLocale();
   const [suggestions, setSuggestions] = useState<QuickSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState(false);
   const [activeLabel, setActiveLabel] = useState<string | null>(null);
   const [answer, setAnswer] = useState<string | null>(null);
   const [answerLoading, setAnswerLoading] = useState(false);
+  const [answerError, setAnswerError] = useState(false);
 
   async function loadSuggestions(exclude: string[] = []) {
     if (!destination.trim()) return;
     setLoading(true);
+    setLoadError(false);
     try {
       const data = await api.post<{ suggestions: QuickSuggestion[] }>("/ai/quick-suggestions", {
         destination,
@@ -30,6 +33,8 @@ export function AiSuggestions({ destination, days }: Props) {
         exclude,
       });
       setSuggestions(data.suggestions);
+    } catch {
+      setLoadError(true);
     } finally {
       setLoading(false);
     }
@@ -38,6 +43,7 @@ export function AiSuggestions({ destination, days }: Props) {
   async function askSuggestion(s: QuickSuggestion) {
     setActiveLabel(s.label);
     setAnswer(null);
+    setAnswerError(false);
     setAnswerLoading(true);
     try {
       const data = await api.post<{ answer: string }>("/ai/quick-answer", {
@@ -47,6 +53,8 @@ export function AiSuggestions({ destination, days }: Props) {
         locale,
       });
       setAnswer(data.answer);
+    } catch {
+      setAnswerError(true);
     } finally {
       setAnswerLoading(false);
     }
@@ -93,9 +101,15 @@ export function AiSuggestions({ destination, days }: Props) {
         </div>
       )}
 
+      {loadError && <p className="text-xs text-red-500 mt-2">{t("aiSuggestions.error")}</p>}
+
       {activeLabel && (
         <Modal title={activeLabel} onClose={() => setActiveLabel(null)}>
-          {answerLoading ? t("common.loading") : answer}
+          {answerLoading
+            ? t("common.loading")
+            : answerError
+              ? t("aiSuggestions.error")
+              : answer}
         </Modal>
       )}
     </div>

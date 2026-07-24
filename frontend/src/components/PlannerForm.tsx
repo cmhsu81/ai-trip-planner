@@ -61,6 +61,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
   const [suggestedInterests, setSuggestedInterests] = useState<string[]>([]);
   const [selectedInterests, setSelectedInterests] = useState<string[]>([]);
   const [loadingInterests, setLoadingInterests] = useState(false);
+  const [interestsError, setInterestsError] = useState(false);
 
   const daysAreDerived = Boolean(arrivalDate && departureDate);
   const sameDayInvalidTime = Boolean(
@@ -94,6 +95,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
     }
     const handle = setTimeout(async () => {
       setLoadingInterests(true);
+      setInterestsError(false);
       try {
         const data = await api.post<{ suggestions: string[] }>("/ai/suggest-interests", {
           destination: trimmed,
@@ -103,6 +105,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
         setSelectedInterests([]);
       } catch {
         setSuggestedInterests([]);
+        setInterestsError(true);
       } finally {
         setLoadingInterests(false);
       }
@@ -248,7 +251,10 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
             {t("planner.interestsLoading")}
           </p>
         )}
-        {!loadingInterests && suggestedInterests.length === 0 && (
+        {!loadingInterests && interestsError && (
+          <p className="text-xs text-red-500">{t("planner.interestsError")}</p>
+        )}
+        {!loadingInterests && !interestsError && suggestedInterests.length === 0 && (
           <p className="text-xs text-slate-400">{t("planner.interestsHint")}</p>
         )}
         {suggestedInterests.length > 0 && (

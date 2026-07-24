@@ -38,6 +38,7 @@
   "planner.interests": "Interests",
   "planner.interestsHint": "Enter a destination to get AI-suggested interests",
   "planner.interestsLoading": "Getting suggestions for this destination...",
+  "planner.interestsError": "Couldn't load interest suggestions — you can still generate without them.",
   "planner.mustSee": "Must-see attractions (optional)",
   "planner.mustEat": "Must-eat restaurants (optional)",
   "planner.travelStyle": "Travel style",
@@ -52,6 +53,7 @@
   "aiSuggestions.title": "Curious about this destination?",
   "aiSuggestions.cta": "Get AI suggestions",
   "aiSuggestions.regenerate": "🔄 Show different ideas",
+  "aiSuggestions.error": "Something went wrong getting this. Please try again.",
 
   "chat.title": "Refine with AI",
   "chat.placeholder": "e.g. Replace day 2 lunch with something cheaper, or extend the museum visit to 2 hours",
