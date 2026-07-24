@@ -10,6 +10,8 @@ const WEB_SEARCH_TOOL: Anthropic.Messages.WebSearchTool20250305 = {
   max_uses: 8,
 };
 
+type Tools = Anthropic.MessageCreateParamsNonStreaming["tools"];
+
 function languageName(locale: Locale): string {
   return locale === "zh" ? "Traditional Chinese (繁體中文)" : "English";
 }
@@ -89,6 +91,54 @@ function collectText(content: Anthropic.Messages.ContentBlock[]): string {
     .join("\n");
 }
 
+/**
+ * Calls Claude expecting a JSON response. LLM output isn't guaranteed to be
+ * syntactically valid JSON (a stray comma, an unescaped quote, etc.), so on a
+ * parse failure this feeds the broken reply back and asks Claude to correct
+ * it, up to MAX_ATTEMPTS total calls, instead of failing the whole request.
+ */
+async function createJsonMessage<T>(
+  system: string,
+  initialMessages: Anthropic.Messages.MessageParam[],
+  maxTokens: number,
+  extract: (text: string) => T,
+  tools?: Tools
+): Promise<T> {
+  const MAX_ATTEMPTS = 3;
+  let messages = initialMessages;
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    const response = await client.messages.create({
+      model: env.anthropicModel,
+      max_tokens: maxTokens,
+      temperature: 0.4,
+      system,
+      tools,
+      messages,
+    });
+
+    const text = collectText(response.content);
+    try {
+      return extract(text);
+    } catch (err) {
+      lastError = err instanceof Error ? err : new Error(String(err));
+      if (attempt === MAX_ATTEMPTS) break;
+      messages = [
+        ...messages,
+        { role: "assistant", content: response.content as unknown as Anthropic.Messages.ContentBlockParam[] },
+        {
+          role: "user",
+          content:
+            "That response was not valid JSON and failed to parse. Respond again with ONLY the corrected, complete, valid JSON — no markdown fences, no extra commentary.",
+        },
+      ];
+    }
+  }
+
+  throw new Error(`Claude did not return valid JSON after ${MAX_ATTEMPTS} attempts: ${lastError?.message}`);
+}
+
 export interface GenerateItineraryParams {
   destination: string;
   days: number;
@@ -126,17 +176,13 @@ Budget: ${params.budget || "not specified"}
 
 Research current top-rated attractions/restaurants and recent (last 1-2 years) relevant news, weather patterns, and local events for this destination before building the plan.`;
 
-  const response = await client.messages.create({
-    model: env.anthropicModel,
-    max_tokens: 8000,
-    system: buildSystemPrompt(params.locale),
-    tools: [WEB_SEARCH_TOOL],
-    messages: [{ role: "user", content: userPrompt }],
-  });
-
-  const text = collectText(response.content);
-  const parsed = extractJson(text) as ItineraryDraft;
-  return parsed;
+  return createJsonMessage(
+    buildSystemPrompt(params.locale),
+    [{ role: "user", content: userPrompt }],
+    8000,
+    (text) => extractJson(text) as ItineraryDraft,
+    [WEB_SEARCH_TOOL]
+  );
 }
 
 export interface ChatRefineParams {
@@ -174,16 +220,15 @@ ${languageInstruction(params.locale)}`;
     { role: "user" as const, content: params.userMessage },
   ];
 
-  const response = await client.messages.create({
-    model: env.anthropicModel,
-    max_tokens: 8000,
+  const parsed = await createJsonMessage(
     system,
-    tools: [WEB_SEARCH_TOOL],
     messages,
-  });
+    8000,
+    (text) =>
+      extractJson(text) as ChatRefineResult & { updatedItinerary?: ItineraryDraft | null },
+    [WEB_SEARCH_TOOL]
+  );
 
-  const text = collectText(response.content);
-  const parsed = extractJson(text) as ChatRefineResult & { updatedItinerary?: ItineraryDraft | null };
   return {
     reply: parsed.reply,
     isChangeRequest: Boolean(parsed.isChangeRequest && parsed.updatedItinerary),
@@ -196,15 +241,12 @@ export async function suggestInterests(destination: string, locale: Locale): Pro
     locale
   )}`;
 
-  const response = await client.messages.create({
-    model: env.anthropicModel,
-    max_tokens: 500,
+  const parsed = await createJsonMessage(
     system,
-    messages: [{ role: "user", content: `Destination: ${destination}` }],
-  });
-
-  const text = collectText(response.content);
-  const parsed = extractJsonArray(text);
+    [{ role: "user", content: `Destination: ${destination}` }],
+    500,
+    (text) => extractJsonArray(text)
+  );
   return parsed.filter((v): v is string => typeof v === "string");
 }
 
@@ -226,16 +268,12 @@ Respond with ONLY a JSON array of exactly 5 objects: [{ "id": string, "label": s
     locale
   )}`;
 
-  const response = await client.messages.create({
-    model: env.anthropicModel,
-    max_tokens: 800,
+  return createJsonMessage(
     system,
-    messages: [{ role: "user", content: `Destination: ${destination}, trip length: ${days} days` }],
-  });
-
-  const text = collectText(response.content);
-  const parsed = extractJsonArray(text) as QuickSuggestion[];
-  return parsed;
+    [{ role: "user", content: `Destination: ${destination}, trip length: ${days} days` }],
+    800,
+    (text) => extractJsonArray(text) as QuickSuggestion[]
+  );
 }
 
 export async function quickAnswer(
