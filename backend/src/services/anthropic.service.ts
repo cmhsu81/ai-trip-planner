@@ -179,7 +179,13 @@ Research current top-rated attractions/restaurants and recent (last 1-2 years) r
     buildSystemPrompt(params.locale),
     [{ role: "user", content: userPrompt }],
     8000,
-    (text) => extractJson(text) as ItineraryDraft,
+    (text) => {
+      const parsed = extractJson(text) as ItineraryDraft;
+      if (typeof parsed.destination !== "string" || !Array.isArray(parsed.days)) {
+        throw new Error("Claude JSON response is missing required itinerary fields");
+      }
+      return parsed;
+    },
     [WEB_SEARCH_TOOL]
   );
 }
@@ -223,8 +229,13 @@ ${languageInstruction(params.locale)}`;
     system,
     messages,
     8000,
-    (text) =>
-      extractJson(text) as ChatRefineResult & { updatedItinerary?: ItineraryDraft | null },
+    (text) => {
+      const result = extractJson(text) as ChatRefineResult & { updatedItinerary?: ItineraryDraft | null };
+      if (typeof result.reply !== "string" || result.reply.length === 0) {
+        throw new Error("Claude JSON response is missing the required 'reply' field");
+      }
+      return result;
+    },
     [WEB_SEARCH_TOOL]
   );
 
