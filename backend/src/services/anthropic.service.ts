@@ -112,7 +112,6 @@ async function createJsonMessage<T>(
     const response = await client.messages.create({
       model: env.anthropicModel,
       max_tokens: maxTokens,
-      temperature: 0.4,
       system,
       tools,
       messages,
