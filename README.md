@@ -1,56 +1,56 @@
 # AI Trip Planner
 
-用 AI 規劃旅遊行程的全端網頁應用。使用者輸入天數、目的地與偏好，Claude 會上網搜尋熱門景點、餐廳評價、近期新聞與天氣資訊，產生完整行程表；使用者可以勾選確認、刪除、編輯行程項目，也可以透過對話框請 AI 調整（換景點、延長停留時間等），所有行程都會存進資料庫，支援中英文介面切換。
+A full-stack web app that plans trips with AI. The user enters the number of days, a destination, and preferences; Claude searches the web for popular attractions, restaurant reviews, recent news, and weather information, and produces a complete itinerary. Users can check off, delete, or edit itinerary items, or ask the AI to adjust the plan through a chat dialog (swap an attraction, extend a stay, etc.). Everything is saved to a database, and the UI supports switching between Chinese and English.
 
-📘 **想從零開始照著做一遍？看 [TUTORIAL.md](./TUTORIAL.md)** —— 完整漸進式教學，包含每個技術決策的原因，適合當作學習筆記或面試前複習。
+📘 **Want to build it from scratch yourself? See [TUTORIAL.md](./TUTORIAL.md)** — a full progressive tutorial that explains the reasoning behind every technical decision, useful as study notes or interview prep.
 
-## 技術棧
+## Tech Stack
 
 | | |
 |---|---|
-| 前端 | Next.js (App Router) + TypeScript + Tailwind CSS |
-| 後端 | Node.js + Express + TypeScript |
-| 資料庫 | PostgreSQL（Prisma ORM，可用 [Neon](https://neon.tech) / [Supabase](https://supabase.com) 免費方案） |
-| AI | Claude API（`@anthropic-ai/sdk`），使用 `web_search` 工具即時查詢資料 |
-| 驗證 | JWT（email/password 登入） |
+| Frontend | Next.js (App Router) + TypeScript + Tailwind CSS |
+| Backend | Node.js + Express + TypeScript |
+| Database | PostgreSQL (Prisma ORM; [Neon](https://neon.tech) / [Supabase](https://supabase.com) free tier both work) |
+| AI | Claude API (`@anthropic-ai/sdk`), using the `web_search` tool for real-time lookups |
+| Auth | JWT (email/password login) |
 
-## 功能
+## Features
 
-- 依天數、目的地、興趣、指定景點/餐廳、旅遊風格、預算，AI 產生完整每日行程
-- AI 會上網搜尋熱門景點/餐廳評價、近 1–2 年新聞、天氣等資訊作為規劃依據，並給出可行性評估
-- 行程項目可勾選確認、刪除、編輯（改時間/時長/描述），或請 AI 換一個
-- 對話框可持續與 AI 討論、即時調整行程
-- 「我的行程」頁面保存所有歷史行程
-- 中文 / English 介面切換
+- AI generates a complete daily itinerary based on number of days, destination, interests, must-see attractions/restaurants, travel style, and budget
+- The AI searches the web for popular attractions/restaurant reviews, news from the last 1–2 years, and weather to inform planning, and provides a feasibility assessment
+- Itinerary items can be checked off, deleted, edited (time/duration/description), or swapped out by the AI
+- Ongoing chat with the AI for live itinerary adjustments
+- A "My Trips" page keeps all past trips
+- Chinese / English UI switching
 
-## 專案結構
+## Project Structure
 
 ```
 ai-trip-planner/
 ├── backend/    # Express API server
 ├── frontend/   # Next.js app
-└── TUTORIAL.md # 從零開始的完整教學
+└── TUTORIAL.md # Full tutorial, built from scratch
 ```
 
-## 快速開始
+## Quick Start
 
-### 1. 後端
+### 1. Backend
 
 ```bash
 cd backend
 npm install
-cp .env.example .env   # 填入 DATABASE_URL、JWT_SECRET、ANTHROPIC_API_KEY
+cp .env.example .env   # fill in DATABASE_URL, JWT_SECRET, ANTHROPIC_API_KEY
 npx prisma migrate dev --name init
 npm run dev             # http://localhost:4000
 ```
 
-### 2. 前端
+### 2. Frontend
 
 ```bash
 cd frontend
 npm install
-cp .env.local.example .env.local   # 預設指向 http://localhost:4000/api
+cp .env.local.example .env.local   # defaults to http://localhost:4000/api
 npm run dev              # http://localhost:3000
 ```
 
-詳細的每一步說明、設計理由、以及後續可延伸的方向，請見 [TUTORIAL.md](./TUTORIAL.md)。
+For step-by-step instructions, design rationale, and future extension ideas, see [TUTORIAL.md](./TUTORIAL.md).
