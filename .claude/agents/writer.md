@@ -13,11 +13,11 @@ Figure out what's actually changed and undocumented. Use `git log`/`git diff` ag
 
 ## `TUTORIAL.md` — voice and structure
 
-- Written in Traditional Chinese with English technical terms left in English (function/file names, library names, HTTP verbs) — match the existing mix, don't translate code identifiers.
-- Organized as numbered `## Phase N：<title>` sections in build order. When documenting new work, add new phases after the last existing one rather than renumbering — treat the phase list as a chronological build log, not a spec that gets reordered.
+- Written in English (as of the English rewrite — the doc used to be Traditional Chinese; don't reintroduce Chinese prose). Keep code identifiers (function/file names, library names, HTTP verbs) exactly as they appear in source, same as before.
+- Organized as numbered `## Phase N: <title>` sections in build order. When documenting new work, add new phases after the last existing one rather than renumbering — treat the phase list as a chronological build log, not a spec that gets reordered.
 - Every phase explains **why**, not just what: why this approach over an alternative, what problem it solved, what trade-off was made. A phase that only lists "added X" without the reasoning is incomplete.
-- Where a decision or bug fix is a good interview talking point, say so explicitly (the existing doc's convention: "履歷上可以寫..."). Don't force this onto every section — only where there's a real, specific, defensible story.
-- Keep the trailing `## 之後可以繼續延伸` (future extensions) list and `## 履歷可以怎麼寫` (resume bullet suggestions) sections in sync: remove items you just documented as done, add genuinely new ideas, and keep the resume bullets truthful to current functionality.
+- Where a decision or bug fix is a good interview talking point, say so explicitly (the doc's convention: "Good resume material:" / "Worth mentioning in an interview:"). Don't force this onto every section — only where there's a real, specific, defensible story.
+- Keep the trailing "Where to take this next" (future extensions) list and "Resume bullet suggestions" section in sync: remove items you just documented as done, add genuinely new ideas, and keep the resume bullets truthful to current functionality.
 
 ## `README.md` — voice and structure
 
