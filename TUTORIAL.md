@@ -81,9 +81,10 @@ JWT_SECRET=一組隨機長字串
 JWT_EXPIRES_IN=7d
 ANTHROPIC_API_KEY=sk-ant-...
 ANTHROPIC_MODEL=claude-sonnet-5
+ANTHROPIC_FAST_MODEL=claude-haiku-4-5
 ```
 
-`src/config/env.ts` 統一讀取並驗證這些變數，其他程式碼都從這裡拿設定值，而不是到處寫 `process.env.XXX`——這樣缺變數時會在啟動時就直接報錯，而不是等到某個 request 才爆炸。
+`src/config/env.ts` 統一讀取並驗證這些變數，其他程式碼都從這裡拿設定值，而不是到處寫 `process.env.XXX`——這樣缺變數時會在啟動時就直接報錯，而不是等到某個 request 才爆炸。`ANTHROPIC_FAST_MODEL` 是 Phase 18 才加的，給輕量呼叫（興趣建議、快速提問按鈕）用便宜的模型分流，是後來優化成本時才補上的環境變數，見 Phase 18.3。
 
 ---
 
@@ -138,14 +139,14 @@ npx prisma migrate dev --name init
 - 這樣可以用同一組呼叫涵蓋「景點/餐廳評價」「新聞」「天氣/活動」多種資訊需求，非常適合這種需要「即時、多面向資訊整合」的應用
 
 ```ts
-const WEB_SEARCH_TOOL: Anthropic.Messages.WebSearchTool20250305 = {
-  type: "web_search_20250305",
-  name: "web_search",
-  max_uses: 8,
-};
+function webSearchTool(maxUses: number): Anthropic.Messages.WebSearchTool20250305 {
+  return { type: "web_search_20250305", name: "web_search", max_uses: maxUses };
+}
 ```
 
-呼叫 `client.messages.create({ model, tools: [WEB_SEARCH_TOOL], system, messages })` 時，Claude 會在單一個 API request 裡自行判斷要不要搜尋、搜幾次（這裡設上限 8 次避免失控），伺服器端處理完才把最終文字回傳給你。
+呼叫 `client.messages.create({ model, tools: [webSearchTool(n)], system, messages })` 時，Claude 會在單一個 API request 裡自行判斷要不要搜尋、搜幾次（`max_uses` 設一個上限避免失控），伺服器端處理完才把最終文字回傳給你。
+
+> 這裡原本是一個寫死 `max_uses: 8` 的共用常數 `WEB_SEARCH_TOOL`，Phase 18 做目的地研究快取時把它改成依呼叫情境給不同搜尋預算的 `webSearchTool(maxUses)` function——細節見 Phase 18。
 
 ### 5.2 如何讓 LLM 回傳「結構化資料」而不是自由文字
 
@@ -186,7 +187,7 @@ const WEB_SEARCH_TOOL: Anthropic.Messages.WebSearchTool20250305 = {
 
 ## Phase 7：後端 — 串起來 & 本機測試
 
-`src/index.ts` 把 CORS、JSON body parser、三組路由（`/api/auth`、`/api/trips`、`/api/ai`）跟統一錯誤處理（`errorHandler`）串起來。
+`src/app.ts` 的 `createApp()` 把 CORS、JSON body parser、三組路由（`/api/auth`、`/api/trips`、`/api/ai`）跟統一錯誤處理（`errorHandler`）串起來，並匯出建好的 `app`；`src/index.ts` 只負責 `app.listen(env.port)`。把「組裝 app」跟「啟動 server（bind port）」拆成兩個檔案，是為了讓 Phase 19 的 API 整合測試可以直接用 `supertest` 打 `app` 而不用真的監聽一個 port——這個小重構在寫測試之前就已經值得做。
 
 ```bash
 npm run dev
@@ -352,8 +353,10 @@ model DestinationResearch {
 
 ```ts
 export async function getDestinationResearch(destination: string, locale: Locale): Promise<string> {
+  const key = normalizeDestination(destination); // trim + lowercase, so "Tokyo" / " tokyo " share a cache row
+
   const cached = await prisma.destinationResearch.findUnique({
-    where: { destination_locale: { destination: normalize(destination), locale } },
+    where: { destination_locale: { destination: key, locale } },
   });
 
   if (cached && Date.now() - cached.updatedAt.getTime() < CACHE_TTL_MS) {
@@ -361,7 +364,11 @@ export async function getDestinationResearch(destination: string, locale: Locale
   }
 
   const content = await researchDestination(destination, locale); // cache miss：查一次、存起來
-  await prisma.destinationResearch.upsert({ /* ... */ });
+  await prisma.destinationResearch.upsert({
+    where: { destination_locale: { destination: key, locale } },
+    create: { destination: key, locale, content },
+    update: { content },
+  });
   return content;
 }
 ```
@@ -378,12 +385,57 @@ export async function getDestinationResearch(destination: string, locale: Locale
 
 ---
 
+## Phase 19：自動化測試（Vitest）
+
+MVP 跟 Phase 16-18 的功能都做完之後，補上了一套 Vitest 測試套件，涵蓋前後端最容易壞、也最值得測的邏輯——不是為了衝覆蓋率，而是挑「壞了會真的出事、而且不需要真的連資料庫/呼叫 Claude API 就能測」的部分。
+
+### 19.1 後端：`backend/src/**/*.test.ts`
+
+用 Vitest + `supertest`（對 Express app 發真的 HTTP request，但不用真的監聽 port）+ `vi.mock()`（mock 掉 `../db/prisma` 跟 `@anthropic-ai/sdk`，測試環境沒有真的 `DATABASE_URL` / `ANTHROPIC_API_KEY`，所以每個測試都必須完全自給自足）：
+
+- `services/anthropic.service.test.ts`：`extractJson` / `extractJsonArray` 的容錯解析（plain JSON、fenced JSON、前後夾雜文字、格式錯誤要丟錯），以及 `createJsonMessage` 的重試機制——mock `messages.create` 讓它前幾次回傳壞掉的 JSON，驗證真的會重送、重送次數上限是 3 次、超過就丟出明確錯誤。也測了 Phase 18.3 提到的那個真實 bug：JSON 語法正確但缺少必要欄位（如 `reply`）時要能被抓到並觸發重試，而不是悄悄放行壞資料。
+- `services/destinationResearch.service.test.ts`：cache hit（在 TTL 內，不呼叫 `researchDestination`）、cache miss（沒有快取或 TTL 過期，會呼叫 `researchDestination` 並 `upsert`）、目的地字串正規化（trim + lowercase）分別測。
+- `middleware/auth.test.ts`：`requireAuth` 對缺 header、格式錯誤、token 無效、token 過期都回 401，合法 token 則把 `req.user` 填好並呼叫 `next()`。
+- `controllers/auth.controller.test.ts`：註冊會雜湊密碼（不是明文存進 `create`）、擋重複 email、登入密碼對/錯的結果。
+- `controllers/trips.controller.test.ts`：**authorization 測試**——用兩個不同 `userId` 簽出的 JWT（owner / attacker）分別打同一個 `tripId`/`itemId`，驗證非擁有者一律拿到 404（而不是洩漏「這筆資料存在但你沒權限」的 403），涵蓋讀取、改標題、刪除行程、改/刪行程項目。這組測試把 Phase 6 提到的 `assertItemOwnership` 授權邏輯用可重複執行的方式釘死，之後改程式碼如果不小心弄壞授權檢查，跑一次 `npm test` 就會抓到，而不是等到真的出資安事故才發現（目前還是手動跑，還沒接上 CI，見「之後可以繼續延伸」）。
+
+### 19.2 前端：`frontend/src/**/*.test.tsx`
+
+用 Vitest + `@testing-library/react`（`jsdom` 環境）+ `@testing-library/user-event`，只測「有邏輯」的東西，純渲染的靜態元件不測：
+
+- `components/PlannerForm.test.tsx`：Phase 16 做的日期/時間驗證邏輯——同一天但離開時間早於抵達時間要擋下並顯示錯誤、跨天不誤判、天數會依日期區間自動算出且輸入框停用、改抵達日期讓既有的離開日期失效時要自動清空。
+- `contexts/LocaleContext.test.tsx`：`t()` 對已知/未知 key 的行為、切換語言後翻譯跟著換、`localStorage` 有記住選擇、`useLocale()` 在 `LocaleProvider` 外使用會丟錯。
+
+### 19.3 為什麼這樣切
+
+測試優先度不是「每個檔案都要有測試」，而是照這個順序想：這段邏輯壞掉的後果有多嚴重（授權漏洞 > UI 驗證邏輯錯誤 > 純樣式問題）、這段邏輯本身有沒有分支/邊界條件值得測（`extractJson` 的容錯解析、日期比較的邊界都有明確的對/錯 case）、以及能不能在不連真實服務的情況下測（所以 Prisma 跟 Anthropic SDK 都在 module 邊界被 mock 掉）。履歷上可以寫「用 Vitest + Supertest 建立後端 API 整合測試，涵蓋 LLM 輸出容錯解析與資源層級授權；前端用 Vitest + React Testing Library 覆蓋表單驗證與多語系邏輯」。
+
+跑法：
+
+```bash
+cd backend && npm test          # 或 npm run test:watch / npm run test:coverage
+cd frontend && npm test         # 或 npm run test:watch
+```
+
+---
+
+## Phase 20：AI agent 輔助開發——用 subagent 分工
+
+這個專案本身也是拿 Claude Code 當開發工具做出來的，`.claude/agents/` 底下定義了兩個專案範圍的 subagent，把「寫測試」跟「維護文件」獨立成各自有明確職責、明確限制的角色，而不是每次都丟給同一個通用對話重新解釋一次上下文：
+
+- **`tester`**（`.claude/agents/tester.md`）：專門負責 `backend/`/`frontend/` 的自動化測試。設定裡明確寫死「硬限制」——這個環境沒有真的 `.env`，所以每個測試都必須 mock 掉 Prisma 和 Anthropic SDK，不能依賴真實資料庫或 API；並列出這個 repo 最值得測的邏輯優先順序（LLM JSON 容錯解析 > 目的地快取 > 授權檢查 > 前端驗證邏輯），跟 Phase 19 實際做出來的測試套件一一對應。
+- **`writer`**（`.claude/agents/writer.md`）：專門負責維護 `TUTORIAL.md` / `README.md`，規則包括「先讀程式碼再寫」「文件裡的每個檔案路徑/函式名稱都要對照原始碼」「新功能一定要放進最後一個 Phase 而不是插進中間改編號」——這份教學本身能保持跟程式碼同步（例如這次抓出 `WEB_SEARCH_TOOL` 常數其實已經被重構成 `webSearchTool(maxUses)` function），就是靠這個 subagent 被要求「重讀一次自己寫的東西對照原始碼」。
+
+這是「用 AI agent 輔助開發」在履歷上一個具體、可驗證的故事：不是籠統地說「用 AI 寫程式」，而是講清楚怎麼把工作拆成職責邊界清楚的 subagent（各自有限定的 tool 權限、明確的驗收標準——例如 `tester` 被要求交付前一定要真的跑過 `npm test` 跟 `tsc --noEmit`），並且有機制讓文件不會隨著程式碼演進而漂移。履歷上可以寫「設計專案範圍的 AI subagent 工作流（測試撰寫、文件維護），為每個 agent 定義明確的職責邊界與硬限制，確保產出可驗證且與原始碼同步」。
+
+---
+
 ## 之後可以繼續延伸（讓專案更完整、更適合面試展開講）
 
 - **部署**：前端丟 Vercel（跟 Next.js 是同一家公司做的，設定最簡單），後端丟 Render / Railway / Fly.io，資料庫已經是雲端的 Neon 不用動
 - **Docker 化**：幫前後端各寫一份 `Dockerfile` + `docker-compose.yml`，履歷可以加一條「容器化部署」
-- **測試**：後端用 Vitest 寫 API 整合測試（mock Prisma / Anthropic SDK，涵蓋 JSON 解析容錯邏輯、JWT 驗證、資源層級授權），前端用 Vitest + React Testing Library 涵蓋表單驗證邏輯，更完整的話再加 Playwright 做 E2E
-- **CI/CD**：GitHub Actions 在 PR 時自動跑 `tsc --noEmit`、`eslint`、`next build`、測試套件
+- **CI/CD**：GitHub Actions 在 PR 時自動跑 `tsc --noEmit`、`eslint`、`next build`、Phase 19 那套 Vitest 測試套件，目前這些都還是手動跑
+- **E2E 測試**：Phase 19 做的是單元/整合層級（mock 掉 Prisma 跟 Anthropic SDK），還沒有真的串起前後端、瀏覽器操作的端對端測試，可以加 Playwright 補這一層
 - **更嚴謹的 structured output**：改用 Claude tool use 定義「儲存行程」工具，取代目前用 system prompt 要求純 JSON 的做法
 - **地圖視覺化（Stage 2）**：把 `location` 欄位串 Google Maps Embed API，行程表旁邊加一張互動地圖，點景點卡片可以跳轉/highlight 地圖上對應的標記，並用 Places API 抓景點照片
 - **更完整的 RAG**：如果快取的目的地筆記越來越大，可以進一步導入向量資料庫（例如 Postgres 的 `pgvector` extension，不用額外服務）做語意檢索，取代目前單純用「目的地名稱」查表的做法
@@ -401,3 +453,4 @@ export async function getDestinationResearch(destination: string, locale: Locale
 > - 用 Prisma 設計正規化的關聯式資料庫 schema（使用者/行程/每日行程/行程項目/對話紀錄/目的地研究快取），支援使用者歷史紀錄查詢
 > - 實作 JWT 身份驗證與資源層級的授權檢查，確保使用者只能存取/修改自己的資料
 > - 打造支援即時編輯（勾選確認/刪除/修改）與對話式調整（chatbot，含問題/修改請求自動分類與人工確認機制）雙軌互動的行程管理介面，並支援中英文切換
+> - 用 Vitest + Supertest / React Testing Library 建立前後端測試套件，涵蓋 LLM 輸出容錯解析、資源層級授權、表單驗證等高風險邏輯
