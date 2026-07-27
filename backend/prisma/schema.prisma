@@ -71,3 +71,18 @@ model ChatMessage {
   content   String
   createdAt DateTime @default(now())
 }
+
+// Cached web-research notes for a destination (top attractions/restaurants,
+// customs, typical weather, recent news) so repeat generations for the same
+// destination reuse prior web_search results instead of re-searching from
+// scratch. Keyed by normalized destination + locale; refreshed after TTL.
+model DestinationResearch {
+  id          String   @id @default(uuid())
+  destination String
+  locale      String
+  content     String
+  updatedAt   DateTime @updatedAt
+  createdAt   DateTime @default(now())
+
+  @@unique([destination, locale])
+}

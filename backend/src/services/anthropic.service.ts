@@ -4,11 +4,19 @@ import { ItineraryDraft, Locale } from "../types";
 
 const client = new Anthropic({ apiKey: env.anthropicApiKey });
 
-const WEB_SEARCH_TOOL: Anthropic.Messages.WebSearchTool20250305 = {
-  type: "web_search_20250305",
-  name: "web_search",
-  max_uses: 8,
-};
+function webSearchTool(maxUses: number): Anthropic.Messages.WebSearchTool20250305 {
+  return { type: "web_search_20250305", name: "web_search", max_uses: maxUses };
+}
+
+// Search budgets, tuned down from a single shared max_uses: 8. Destination-level
+// facts (attractions, restaurants, customs) now come from the cached
+// DestinationResearch note instead of being re-searched on every call, so each
+// call only needs a small budget left over for date-specific lookups (this
+// week's weather, an event landing on these exact dates, etc).
+const RESEARCH_SEARCH_BUDGET = 5; // one-time per destination, cached afterwards
+const ITINERARY_SEARCH_BUDGET = 2; // date-specific checks only; bulk research is cached
+const CHAT_SEARCH_BUDGET = 3; // targeted lookups for a single requested change
+const QUICK_ANSWER_SEARCH_BUDGET = 3; // answering one focused question
 
 type Tools = Anthropic.MessageCreateParamsNonStreaming["tools"];
 
@@ -45,21 +53,59 @@ const ITINERARY_JSON_SHAPE = `{
   ]
 }`;
 
-function buildSystemPrompt(locale: Locale): string {
-  return `You are an expert AI travel planner. You have access to a web_search tool — use it to look up:
-- Currently popular attractions and restaurants (consider Google Maps, TripAdvisor, and Yelp style ratings/reviews when reasoning)
-- News from the last 1-2 years relevant to the destination (safety, closures, new attractions, events, festivals)
-- Expected weather/season conditions for the travel dates
-- Local events or holidays that could affect the plan
+function buildSystemPrompt(locale: Locale, researchContext: string): string {
+  return `You are an expert AI travel planner.
 
-Use search results to ground your recommendations in current, real information rather than guessing. Judge feasibility: flag anything unrealistic (too many stops in one day, conflicting travel times, seasonal closures, extreme weather, arriving/leaving too late/early for planned activities) inside "feasibilityNotes".
+Pre-researched notes about this destination (attractions, restaurants, customs, typical weather, recent news) — treat this as your primary source instead of re-searching it from scratch:
+"""
+${researchContext}
+"""
+
+You also have a web_search tool with a small remaining budget — use it ONLY for things the notes above can't cover: the weather forecast or events landing specifically within the traveler's exact travel dates. Don't re-research general attractions/restaurants that are already covered in the notes.
+
+Use the notes and any date-specific search results to ground your recommendations in current, real information rather than guessing. Judge feasibility: flag anything unrealistic (too many stops in one day, conflicting travel times, seasonal closures, extreme weather, arriving/leaving too late/early for planned activities) inside "feasibilityNotes".
 
 The first day's plan must start no earlier than the traveler's arrival time, and the last day's plan must end in time for their departure. ${languageInstruction(
     locale
   )}
 
-After researching, respond with ONLY a single JSON object (no markdown fences, no commentary before or after) matching exactly this shape:
+Respond with ONLY a single JSON object (no markdown fences, no commentary before or after) matching exactly this shape:
 ${ITINERARY_JSON_SHAPE}`;
+}
+
+function buildResearchSystemPrompt(locale: Locale): string {
+  return `You are a travel research assistant building a reusable reference note about a destination. Use web_search to gather:
+- Currently popular attractions and restaurants (consider Google Maps, TripAdvisor, and Yelp style ratings/reviews when reasoning)
+- News from the last 1-2 years relevant to the destination (safety, closures, new attractions, events, festivals)
+- Typical weather/seasons throughout the year
+- Local customs, etiquette, and general safety notes
+
+Write a concise but information-dense reference note (plain text, not JSON — short paragraphs or bullet points are fine) that another AI can use later to plan itineraries for this destination without searching again. Do not mention specific travel dates — this note must stay useful for travelers visiting at any time of year. ${languageInstruction(
+    locale
+  )}`;
+}
+
+/**
+ * One-time (per destination+locale, until the cache expires) web-search-heavy
+ * call that produces a reusable reference note. Callers should cache the
+ * result (see destinationResearch.service.ts) instead of calling this on
+ * every itinerary generation — that's what removes most of the repeated
+ * search latency/cost from generateItinerary and chatRefine.
+ */
+export async function researchDestination(destination: string, locale: Locale): Promise<string> {
+  const response = await client.messages.create({
+    model: env.anthropicModel,
+    max_tokens: 1200,
+    system: buildResearchSystemPrompt(locale),
+    tools: [webSearchTool(RESEARCH_SEARCH_BUDGET)],
+    messages: [{ role: "user", content: `Destination: ${destination}` }],
+  });
+
+  const text = collectText(response.content).trim();
+  if (!text) {
+    throw new Error("Claude returned an empty destination research note");
+  }
+  return text;
 }
 
 function extractJson(text: string): unknown {
@@ -97,22 +143,37 @@ function collectText(content: Anthropic.Messages.ContentBlock[]): string {
  * parse failure this feeds the broken reply back and asks Claude to correct
  * it, up to MAX_ATTEMPTS total calls, instead of failing the whole request.
  */
+interface CreateJsonMessageOptions {
+  tools?: Tools;
+  model?: string;
+  // Marks the system prompt as reusable across calls (cache_control), which
+  // only pays off once the system text is at least ~1024 tokens (e.g.
+  // chatRefine's system prompt, which embeds the full current itinerary) —
+  // Anthropic silently skips caching below that, so it's harmless to leave on.
+  cacheSystem?: boolean;
+}
+
 async function createJsonMessage<T>(
   system: string,
   initialMessages: Anthropic.Messages.MessageParam[],
   maxTokens: number,
   extract: (text: string) => T,
-  tools?: Tools
+  options: CreateJsonMessageOptions = {}
 ): Promise<T> {
+  const { tools, model = env.anthropicModel, cacheSystem = false } = options;
   const MAX_ATTEMPTS = 3;
   let messages = initialMessages;
   let lastError: Error | undefined;
 
+  const systemParam: Anthropic.Messages.MessageCreateParamsNonStreaming["system"] = cacheSystem
+    ? [{ type: "text", text: system, cache_control: { type: "ephemeral" } }]
+    : system;
+
   for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
     const response = await client.messages.create({
-      model: env.anthropicModel,
+      model,
       max_tokens: maxTokens,
-      system,
+      system: systemParam,
       tools,
       messages,
     });
@@ -151,6 +212,7 @@ export interface GenerateItineraryParams {
   travelStyle?: string;
   budget?: string;
   locale: Locale;
+  researchContext: string;
 }
 
 export async function generateItinerary(
@@ -173,10 +235,10 @@ Must-include restaurants/food: ${params.mustEatRestaurants?.join(", ") || "none 
 Travel style: ${params.travelStyle || "not specified"}
 Budget: ${params.budget || "not specified"}
 
-Research current top-rated attractions/restaurants and recent (last 1-2 years) relevant news, weather patterns, and local events for this destination before building the plan.`;
+Use the pre-researched destination notes plus targeted date-specific search to build the plan.`;
 
   return createJsonMessage(
-    buildSystemPrompt(params.locale),
+    buildSystemPrompt(params.locale, params.researchContext),
     [{ role: "user", content: userPrompt }],
     8000,
     (text) => {
@@ -186,7 +248,7 @@ Research current top-rated attractions/restaurants and recent (last 1-2 years) r
       }
       return parsed;
     },
-    [WEB_SEARCH_TOOL]
+    { tools: [webSearchTool(ITINERARY_SEARCH_BUDGET)] }
   );
 }
 
@@ -195,6 +257,7 @@ export interface ChatRefineParams {
   conversationHistory: { role: "user" | "assistant"; content: string }[];
   userMessage: string;
   locale: Locale;
+  researchContext: string;
 }
 
 export interface ChatRefineResult {
@@ -208,9 +271,14 @@ export async function chatRefine(params: ChatRefineParams): Promise<ChatRefineRe
 The current itinerary (JSON) is:
 ${JSON.stringify(params.currentItinerary, null, 2)}
 
+Pre-researched notes about this destination (reuse these instead of re-searching general attractions/restaurants/customs):
+"""
+${params.researchContext}
+"""
+
 First decide whether the user's message is:
 (a) a QUESTION — they just want information (e.g. "what's good to eat at XXX", "how's the weather in March") — answer it in "reply" and set "isChangeRequest" to false. Do NOT include "updatedItinerary".
-(b) a CHANGE REQUEST — they want you to modify the itinerary (delete/replace/extend/reorder/add an item). Use web_search if you need fresh recommendations. Set "isChangeRequest" to true, put a short explanation of the proposed change in "reply", and include the FULL updated itinerary in "updatedItinerary" (this is only a proposal — it will not be applied unless the user confirms it).
+(b) a CHANGE REQUEST — they want you to modify the itinerary (delete/replace/extend/reorder/add an item). Use web_search sparingly, only for something specific the notes above don't cover. Set "isChangeRequest" to true, put a short explanation of the proposed change in "reply", and include the FULL updated itinerary in "updatedItinerary" (this is only a proposal — it will not be applied unless the user confirms it).
 
 Respond with ONLY a single JSON object (no markdown fences) of this shape:
 {
@@ -236,7 +304,7 @@ ${languageInstruction(params.locale)}`;
       }
       return result;
     },
-    [WEB_SEARCH_TOOL]
+    { tools: [webSearchTool(CHAT_SEARCH_BUDGET)], cacheSystem: true }
   );
 
   return {
@@ -255,7 +323,8 @@ export async function suggestInterests(destination: string, locale: Locale): Pro
     system,
     [{ role: "user", content: `Destination: ${destination}` }],
     500,
-    (text) => extractJsonArray(text)
+    (text) => extractJsonArray(text),
+    { model: env.anthropicFastModel }
   );
   return parsed.filter((v): v is string => typeof v === "string");
 }
@@ -282,7 +351,8 @@ Respond with ONLY a JSON array of exactly 5 objects: [{ "id": string, "label": s
     system,
     [{ role: "user", content: `Destination: ${destination}, trip length: ${days} days` }],
     800,
-    (text) => extractJsonArray(text) as QuickSuggestion[]
+    (text) => extractJsonArray(text) as QuickSuggestion[],
+    { model: env.anthropicFastModel }
   );
 }
 
@@ -300,7 +370,7 @@ export async function quickAnswer(
     model: env.anthropicModel,
     max_tokens: 1200,
     system,
-    tools: [WEB_SEARCH_TOOL],
+    tools: [webSearchTool(QUICK_ANSWER_SEARCH_BUDGET)],
     messages: [
       { role: "user", content: `Destination: ${destination}, trip length: ${days} days.\nQuestion: ${question}` },
     ],

@@ -11,6 +11,7 @@ import {
   suggestInterests,
 } from "../services/anthropic.service";
 import { getTripWithItinerary, replaceTripItinerary, tripToDraft } from "../services/itinerary.service";
+import { getDestinationResearch } from "../services/destinationResearch.service";
 
 const localeSchema = z.enum(["en", "zh"]).default("zh");
 
@@ -35,7 +36,8 @@ export async function generate(req: AuthRequest, res: Response, next: NextFuncti
     const userId = req.user!.userId;
     const input = generateSchema.parse(req.body);
 
-    const draft = await generateItinerary(input);
+    const researchContext = await getDestinationResearch(input.destination, input.locale);
+    const draft = await generateItinerary({ ...input, researchContext });
 
     const trip = await prisma.trip.create({
       data: {
@@ -83,11 +85,13 @@ export async function chat(req: AuthRequest, res: Response, next: NextFunction) 
     }));
 
     const currentDraft = tripToDraft(trip);
+    const researchContext = await getDestinationResearch(trip.destination, locale);
     const result = await chatRefine({
       currentItinerary: currentDraft,
       conversationHistory,
       userMessage: message,
       locale,
+      researchContext,
     });
 
     await prisma.chatMessage.create({ data: { tripId, role: "user", content: message } });

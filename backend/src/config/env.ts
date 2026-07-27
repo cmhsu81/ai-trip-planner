@@ -16,4 +16,7 @@ export const env = {
   jwtExpiresIn: process.env.JWT_EXPIRES_IN ?? "7d",
   anthropicApiKey: required("ANTHROPIC_API_KEY"),
   anthropicModel: process.env.ANTHROPIC_MODEL ?? "claude-sonnet-5",
+  // Cheaper/faster model for lightweight, non-critical calls (interest tags,
+  // quick-suggestion buttons) that don't need the primary model's quality.
+  anthropicFastModel: process.env.ANTHROPIC_FAST_MODEL ?? "claude-haiku-4-5",
 };
