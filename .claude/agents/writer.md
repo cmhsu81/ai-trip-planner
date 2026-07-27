@@ -1,5 +1,5 @@
 ---
-name: docs
+name: writer
 description: Use this agent to update TUTORIAL.md and/or README.md after a feature or architecture change, document a new development phase, or refresh the resume-bullet suggestions to match what's actually been built. Trigger whenever asked to write docs, update the tutorial, sync the README, or write up a change for someone learning from this repo.
 tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
