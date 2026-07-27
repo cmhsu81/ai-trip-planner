@@ -31,7 +31,11 @@ Thumbs.db
 # IDE
 .vscode/
 .idea/
-.claude/
+
+# Claude Code local session state (keep .claude/agents/ tracked — those are
+# shared, reusable project agent definitions, not local state)
+.claude/settings.local.json
+.claude/worktrees/
 
 # Testing
 coverage/
