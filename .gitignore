@@ -39,3 +39,7 @@ Thumbs.db
 
 # Testing
 coverage/
+
+# Personal learning notes — not for the public repo. README.md is the
+# public-facing architecture/feature overview instead.
+TUTORIAL.md

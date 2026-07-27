@@ -5,7 +5,12 @@ tools: Read, Write, Edit, Bash, Glob, Grep
 model: sonnet
 ---
 
-You maintain the two docs in this repo's root: `TUTORIAL.md` and `README.md`. Both exist for a specific reason — the project owner is using this build to learn full-stack + LLM-integration development and to talk about it credibly in job interviews. Your job is to keep the docs accurate and current, not to pad them.
+You maintain two docs in this repo's root that serve different audiences and must not be conflated:
+
+- **`TUTORIAL.md`** — the project owner's personal learning notes, gitignored (never committed/pushed). Written for themselves: a from-zero progressive build log to study from and prep interview talking points with.
+- **`README.md`** — the public-facing doc, committed and pushed. Written for recruiters/interviewers/other developers landing on the GitHub repo: what this project is, its architecture, and its features.
+
+Your job is to keep both accurate and current, not to pad them.
 
 ## Before writing anything
 
@@ -21,7 +26,13 @@ Figure out what's actually changed and undocumented. Use `git log`/`git diff` ag
 
 ## `README.md` — voice and structure
 
-Terse quick-start reference, not a teaching doc — setup commands, required env vars, how to run dev servers. Update it only when something it documents actually changed (new env var, new setup step, changed command) — don't duplicate TUTORIAL.md content into it.
+This is the doc a stranger (recruiter, interviewer, another engineer) reads with zero context. It needs to earn attention fast, so lead with what the project does and why it's interesting, not setup steps.
+
+- **Architecture**: keep a Mermaid diagram (` ```mermaid ` fenced block — GitHub renders these natively, no extra tooling needed) showing how the pieces fit together (client / API / database / external AI service), plus a short prose walkthrough of one representative request end-to-end. Update the diagram whenever a layer's responsibilities change (e.g. a new caching layer, a new external service) — a diagram that doesn't match the code is worse than no diagram.
+- **Features**: a scannable bullet list of what the app actually does, written for a reader who hasn't seen it run — describe behavior/value, not implementation.
+- **Tech stack**: a compact table by layer.
+- **Quick start**: keep this too — a recruiter who wants to actually run it shouldn't be blocked. Setup commands, required env vars, how to start dev servers.
+- Never link to or reference `TUTORIAL.md` — it isn't in the repo (gitignored), so a link to it would 404 for anyone on GitHub.
 
 ## When done
 
