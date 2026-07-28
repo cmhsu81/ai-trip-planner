@@ -28,6 +28,17 @@ async function request<T>(
 
   if (!res.ok) {
     const body = await res.json().catch(() => ({ error: res.statusText }));
+    if (res.status === 401 && typeof window !== "undefined") {
+      // The token is invalid/expired, or (see errorHandler.ts) refers to an
+      // account that no longer exists — either way, nothing recovers from
+      // this without a fresh login. Clear the stale session so the user
+      // isn't stuck seeing an opaque error with no way forward.
+      localStorage.removeItem("token");
+      localStorage.removeItem("user");
+      if (!["/login", "/register"].includes(window.location.pathname)) {
+        window.location.href = "/login";
+      }
+    }
     throw new ApiError(res.status, body.error ?? "Request failed");
   }
 
