@@ -11,18 +11,21 @@ interface Props {
   days: number;
 }
 
+type AnswerState = { status: "loading" } | { status: "done"; answer: string } | { status: "error" };
+
 export function AiSuggestions({ destination, days }: Props) {
   const { t, locale } = useLocale();
   const [suggestions, setSuggestions] = useState<QuickSuggestion[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState(false);
-  const [activeLabel, setActiveLabel] = useState<string | null>(null);
-  const [answer, setAnswer] = useState<string | null>(null);
-  const [answerLoading, setAnswerLoading] = useState(false);
-  const [answerError, setAnswerError] = useState(false);
-  // Remembers answers for this destination's session so reopening a
-  // previously-clicked suggestion doesn't re-trigger a paid quick-answer call.
-  const [answerCache, setAnswerCache] = useState<Record<string, string>>({});
+  const [activeSuggestion, setActiveSuggestion] = useState<QuickSuggestion | null>(null);
+  // Keyed by question text, independent per suggestion, so switching between
+  // suggestions (or closing the modal mid-request) never clobbers another
+  // suggestion's in-flight request or already-fetched answer. A suggestion
+  // that's already loading or done is never re-fetched — only "error" allows
+  // a retry — so reopening one while it's still generating just re-attaches
+  // to the same request instead of spending another quick-answer call.
+  const [answers, setAnswers] = useState<Record<string, AnswerState>>({});
 
   async function loadSuggestions(exclude: string[] = []) {
     if (!destination.trim()) return;
@@ -43,35 +46,26 @@ export function AiSuggestions({ destination, days }: Props) {
     }
   }
 
-  async function askSuggestion(s: QuickSuggestion) {
-    setActiveLabel(s.label);
-    setAnswerError(false);
+  function askSuggestion(s: QuickSuggestion) {
+    setActiveSuggestion(s);
 
-    const cached = answerCache[s.question];
-    if (cached !== undefined) {
-      setAnswer(cached);
-      return;
-    }
+    const existing = answers[s.question];
+    if (existing && existing.status !== "error") return;
 
-    setAnswer(null);
-    setAnswerLoading(true);
-    try {
-      const data = await api.post<{ answer: string }>("/ai/quick-answer", {
-        destination,
-        days,
-        question: s.question,
-        locale,
+    setAnswers((prev) => ({ ...prev, [s.question]: { status: "loading" } }));
+    api
+      .post<{ answer: string }>("/ai/quick-answer", { destination, days, question: s.question, locale })
+      .then((data) => {
+        setAnswers((prev) => ({ ...prev, [s.question]: { status: "done", answer: data.answer } }));
+      })
+      .catch(() => {
+        setAnswers((prev) => ({ ...prev, [s.question]: { status: "error" } }));
       });
-      setAnswer(data.answer);
-      setAnswerCache((prev) => ({ ...prev, [s.question]: data.answer }));
-    } catch {
-      setAnswerError(true);
-    } finally {
-      setAnswerLoading(false);
-    }
   }
 
   if (!destination.trim()) return null;
+
+  const activeAnswer = activeSuggestion ? answers[activeSuggestion.question] : undefined;
 
   return (
     <div className="border border-slate-200 rounded-2xl bg-white shadow-sm p-5">
@@ -114,13 +108,13 @@ export function AiSuggestions({ destination, days }: Props) {
 
       {loadError && <p className="text-xs text-red-500 mt-2">{t("aiSuggestions.error")}</p>}
 
-      {activeLabel && (
-        <Modal title={activeLabel} onClose={() => setActiveLabel(null)}>
-          {answerLoading
+      {activeSuggestion && (
+        <Modal title={activeSuggestion.label} onClose={() => setActiveSuggestion(null)}>
+          {!activeAnswer || activeAnswer.status === "loading"
             ? t("common.loading")
-            : answerError
+            : activeAnswer.status === "error"
               ? t("aiSuggestions.error")
-              : answer}
+              : activeAnswer.answer}
         </Modal>
       )}
     </div>

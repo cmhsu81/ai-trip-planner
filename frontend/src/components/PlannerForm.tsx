@@ -4,20 +4,13 @@ import { FormEvent, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { api } from "@/lib/api";
 import { GenerateTripInput } from "@/types";
+import { TagInput } from "./TagInput";
 
 interface Props {
   onSubmit: (input: GenerateTripInput) => Promise<void>;
   submitting: boolean;
   onDestinationChange?: (destination: string) => void;
   onDaysChange?: (days: number) => void;
-}
-
-function splitList(value: string): string[] | undefined {
-  const items = value
-    .split(",")
-    .map((v) => v.trim())
-    .filter(Boolean);
-  return items.length > 0 ? items : undefined;
 }
 
 function daysBetween(from: string, to: string): number | null {
@@ -29,6 +22,16 @@ function daysBetween(from: string, to: string): number | null {
 }
 
 const MAX_BUDGET = 5000;
+
+// Internal values stay fixed English tokens (like ItineraryItemType) so the
+// prompt sent to Claude is consistent regardless of UI locale; only the
+// on-screen label is translated.
+const TRAVEL_STYLES = ["relaxed", "moderate", "packed"] as const;
+const TRAVEL_STYLE_LABEL_KEYS = [
+  "planner.travelStyleRelaxed",
+  "planner.travelStyleModerate",
+  "planner.travelStylePacked",
+] as const;
 
 const inputClass =
   "w-full border border-slate-300 rounded-lg px-3.5 py-2.5 focus:outline-none focus:ring-2 focus:ring-teal-500/60 focus:border-teal-500 transition-shadow";
@@ -53,9 +56,9 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
   const [arrivalTime, setArrivalTime] = useState("10:00");
   const [departureDate, setDepartureDate] = useState("");
   const [departureTime, setDepartureTime] = useState("18:00");
-  const [mustSee, setMustSee] = useState("");
-  const [mustEat, setMustEat] = useState("");
-  const [travelStyle, setTravelStyle] = useState("");
+  const [mustSeeAttractions, setMustSeeAttractions] = useState<string[]>([]);
+  const [mustEatRestaurants, setMustEatRestaurants] = useState<string[]>([]);
+  const [travelStyleIndex, setTravelStyleIndex] = useState(1); // default: moderate
   const [budgetAmount, setBudgetAmount] = useState(500);
 
   const [suggestedInterests, setSuggestedInterests] = useState<string[]>([]);
@@ -130,9 +133,9 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
       departureDate: departureDate || undefined,
       departureTime: departureTime || "18:00",
       interests: selectedInterests.length > 0 ? selectedInterests : undefined,
-      mustSeeAttractions: splitList(mustSee),
-      mustEatRestaurants: splitList(mustEat),
-      travelStyle: travelStyle || undefined,
+      mustSeeAttractions: mustSeeAttractions.length > 0 ? mustSeeAttractions : undefined,
+      mustEatRestaurants: mustEatRestaurants.length > 0 ? mustEatRestaurants : undefined,
+      travelStyle: TRAVEL_STYLES[travelStyleIndex],
       budget: `$${budgetAmount} USD per person`,
       locale,
     });
@@ -211,14 +214,25 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
           className={`${inputClass} disabled:bg-slate-50 disabled:text-slate-500`}
         />
       </div>
-      <div>
-        <label className={labelClass}>{t("planner.travelStyle")}</label>
+      <div className="bg-slate-50 rounded-xl p-4 border border-slate-100">
+        <label className={labelClass}>
+          {t("planner.travelStyle")}:{" "}
+          <span className="font-semibold text-teal-700">{t(TRAVEL_STYLE_LABEL_KEYS[travelStyleIndex])}</span>
+        </label>
         <input
-          value={travelStyle}
-          onChange={(e) => setTravelStyle(e.target.value)}
-          className={inputClass}
-          placeholder="relaxed / packed / family-friendly"
+          type="range"
+          min={0}
+          max={2}
+          step={1}
+          value={travelStyleIndex}
+          onChange={(e) => setTravelStyleIndex(Number(e.target.value))}
+          className="w-full accent-teal-600"
         />
+        <div className="flex justify-between text-xs text-slate-400">
+          {TRAVEL_STYLE_LABEL_KEYS.map((key) => (
+            <span key={key}>{t(key)}</span>
+          ))}
+        </div>
       </div>
 
       <div className="sm:col-span-2 bg-slate-50 rounded-xl p-4 border border-slate-100">
@@ -282,11 +296,19 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
 
       <div>
         <label className={labelClass}>{t("planner.mustSee")}</label>
-        <input value={mustSee} onChange={(e) => setMustSee(e.target.value)} className={inputClass} />
+        <TagInput
+          values={mustSeeAttractions}
+          onChange={setMustSeeAttractions}
+          placeholder={t("planner.tagInputPlaceholder")}
+        />
       </div>
       <div>
         <label className={labelClass}>{t("planner.mustEat")}</label>
-        <input value={mustEat} onChange={(e) => setMustEat(e.target.value)} className={inputClass} />
+        <TagInput
+          values={mustEatRestaurants}
+          onChange={setMustEatRestaurants}
+          placeholder={t("planner.tagInputPlaceholder")}
+        />
       </div>
 
       <div className="sm:col-span-2">
