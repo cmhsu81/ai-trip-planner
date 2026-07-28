@@ -77,8 +77,13 @@
   "trips.viewButton": "View",
   "trips.deleteButton": "Delete",
   "trips.newTrip": "Plan a New Trip",
+  "trips.saveConfirmTitle": "Save this itinerary?",
+  "trips.saveConfirmBody": "Would you like to keep this trip in \"My Trips\"?",
+  "trips.saveConfirmYes": "Yes, save it",
+  "trips.saveConfirmNo": "No, don't save",
 
   "common.loading": "Loading...",
   "common.error": "Something went wrong",
-  "common.optional": "optional"
+  "common.optional": "optional",
+  "common.back": "Back"
 }

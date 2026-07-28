@@ -20,6 +20,9 @@ export function AiSuggestions({ destination, days }: Props) {
   const [answer, setAnswer] = useState<string | null>(null);
   const [answerLoading, setAnswerLoading] = useState(false);
   const [answerError, setAnswerError] = useState(false);
+  // Remembers answers for this destination's session so reopening a
+  // previously-clicked suggestion doesn't re-trigger a paid quick-answer call.
+  const [answerCache, setAnswerCache] = useState<Record<string, string>>({});
 
   async function loadSuggestions(exclude: string[] = []) {
     if (!destination.trim()) return;
@@ -42,8 +45,15 @@ export function AiSuggestions({ destination, days }: Props) {
 
   async function askSuggestion(s: QuickSuggestion) {
     setActiveLabel(s.label);
-    setAnswer(null);
     setAnswerError(false);
+
+    const cached = answerCache[s.question];
+    if (cached !== undefined) {
+      setAnswer(cached);
+      return;
+    }
+
+    setAnswer(null);
     setAnswerLoading(true);
     try {
       const data = await api.post<{ answer: string }>("/ai/quick-answer", {
@@ -53,6 +63,7 @@ export function AiSuggestions({ destination, days }: Props) {
         locale,
       });
       setAnswer(data.answer);
+      setAnswerCache((prev) => ({ ...prev, [s.question]: data.answer }));
     } catch {
       setAnswerError(true);
     } finally {

@@ -77,8 +77,13 @@
   "trips.viewButton": "查看",
   "trips.deleteButton": "刪除",
   "trips.newTrip": "規劃新行程",
+  "trips.saveConfirmTitle": "要儲存此行程表嗎？",
+  "trips.saveConfirmBody": "要把這趟行程留在「我的行程」裡嗎？",
+  "trips.saveConfirmYes": "是，儲存",
+  "trips.saveConfirmNo": "否，不儲存",
 
   "common.loading": "載入中...",
   "common.error": "發生錯誤",
-  "common.optional": "選填"
+  "common.optional": "選填",
+  "common.back": "上一頁"
 }

@@ -4,11 +4,12 @@ import { ReactNode } from "react";
 
 interface Props {
   title: string;
+  icon?: string;
   onClose: () => void;
   children: ReactNode;
 }
 
-export function Modal({ title, onClose, children }: Props) {
+export function Modal({ title, icon = "💡", onClose, children }: Props) {
   return (
     <div
       className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm flex items-center justify-center p-4 z-50"
@@ -20,7 +21,7 @@ export function Modal({ title, onClose, children }: Props) {
       >
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100">
           <h3 className="font-semibold text-slate-900 flex items-center gap-2">
-            <span className="text-lg">💡</span> {title}
+            <span className="text-lg">{icon}</span> {title}
           </h3>
           <button
             onClick={onClose}
