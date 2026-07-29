@@ -40,6 +40,9 @@ Thumbs.db
 # Testing
 coverage/
 
+# Ad-hoc UI screenshots from the screenshotter agent
+frontend/.screenshots/
+
 # Personal learning notes — not for the public repo. README.md is the
 # public-facing architecture/feature overview instead.
 TUTORIAL.md

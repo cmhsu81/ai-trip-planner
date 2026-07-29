@@ -81,3 +81,4 @@ Backend (`backend/.env`, see `.env.example`): `DATABASE_URL`, `JWT_SECRET`, `JWT
 
 - **`tester`**: adds/maintains backend (Vitest + Supertest) and frontend (Vitest + Testing Library) test coverage. Knows the mock-only constraint and which logic in this repo is worth testing.
 - **`writer`**: maintains `TUTORIAL.md` (personal, gitignored learning notes — never commit this file) and `README.md` (the public-facing architecture/feature overview committed to the repo; never link `TUTORIAL.md` from it, since it isn't in the repo).
+- **`screenshotter`**: boots the backend/frontend dev servers and drives the frontend with Playwright (globally installed, Chromium pre-installed in this environment) to capture real screenshots of pages/flows. No `ANTHROPIC_API_KEY` is available in this environment, so AI-generated screens (itinerary, chat replies) can't be produced end-to-end — it screenshots everything else and flags that gap.
