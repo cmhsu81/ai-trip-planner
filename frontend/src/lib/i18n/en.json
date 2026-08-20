@@ -75,6 +75,7 @@
   "itinerary.cancel": "Cancel",
   "itinerary.confirmed": "Confirmed",
   "itinerary.empty": "No itinerary yet. Fill in the form above to get started.",
+  "itinerary.viewOnMap": "View on Google Maps",
 
   "trips.title": "My Trips",
   "trips.empty": "You haven't planned any trips yet.",

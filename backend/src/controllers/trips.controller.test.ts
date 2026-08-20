@@ -176,4 +176,19 @@ describe("trip ownership enforcement", () => {
     expect(res.status).toBe(404);
     expect(itemUpdate).not.toHaveBeenCalled();
   });
+
+  it("accepts an imageUrl in the PATCH body and passes it through to prisma.itineraryItem.update", async () => {
+    itemUpdate.mockResolvedValue({ ...item, imageUrl: "https://example.com/photo.jpg" });
+
+    const res = await request(app)
+      .patch("/api/trips/trip-1/items/item-1")
+      .set("Authorization", `Bearer ${ownerToken}`)
+      .send({ imageUrl: "https://example.com/photo.jpg" });
+
+    expect(res.status).toBe(200);
+    expect(itemUpdate).toHaveBeenCalledWith({
+      where: { id: "item-1" },
+      data: { imageUrl: "https://example.com/photo.jpg" },
+    });
+  });
 });

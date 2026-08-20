@@ -75,6 +75,7 @@
   "itinerary.cancel": "取消",
   "itinerary.confirmed": "已確認",
   "itinerary.empty": "還沒有行程，請先填寫上方表單。",
+  "itinerary.viewOnMap": "在 Google 地圖查看",
 
   "trips.title": "我的行程",
   "trips.empty": "你還沒有規劃任何行程。",

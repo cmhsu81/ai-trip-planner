@@ -59,6 +59,7 @@ model ItineraryItem {
   location          String?
   estimatedDuration String?
   sourceNote        String?
+  imageUrl          String?
   confirmed         Boolean      @default(true)
   createdAt         DateTime     @default(now())
 }
