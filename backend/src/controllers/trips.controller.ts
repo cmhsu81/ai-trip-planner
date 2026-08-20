@@ -96,6 +96,7 @@ const updateItemSchema = z.object({
   description: z.string().optional(),
   location: z.string().optional(),
   estimatedDuration: z.string().optional(),
+  imageUrl: z.string().optional(),
   type: z.enum(["attraction", "restaurant", "activity", "transport", "lodging"]).optional(),
   confirmed: z.boolean().optional(),
 });

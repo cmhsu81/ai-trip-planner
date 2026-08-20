@@ -16,6 +16,7 @@ export interface ItineraryItem {
   location: string | null;
   estimatedDuration: string | null;
   sourceNote: string | null;
+  imageUrl: string | null;
   confirmed: boolean;
   orderIndex: number;
 }
@@ -95,6 +96,7 @@ export interface ItineraryDraftItem {
   location?: string;
   estimatedDuration?: string;
   sourceNote?: string;
+  imageUrl?: string;
 }
 
 export interface ItineraryDraftDay {

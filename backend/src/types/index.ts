@@ -22,6 +22,7 @@ export interface ItineraryItemDraft {
   location?: string;
   estimatedDuration?: string;
   sourceNote?: string;
+  imageUrl?: string;
 }
 
 export interface ItineraryDayDraft {

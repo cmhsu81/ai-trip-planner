@@ -13,6 +13,11 @@ const TYPE_STYLE: Record<ItineraryItem["type"], { icon: string; badge: string }>
   lodging: { icon: "🏨", badge: "bg-pink-50 text-pink-700 border-pink-200" },
 };
 
+export function googleMapsUrl(item: ItineraryItem): string {
+  const query = item.location || item.title;
+  return `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(query)}`;
+}
+
 interface Props {
   tripId: string;
   itineraryDays: ItineraryDay[];
@@ -156,6 +161,17 @@ export function ItineraryView({ tripId, itineraryDays, onChange, onAskAiToReplac
                         className="mt-1.5 h-4 w-4 accent-teal-600 cursor-pointer"
                         title={t("itinerary.confirmed")}
                       />
+                      {item.imageUrl && (
+                        // eslint-disable-next-line @next/next/no-img-element -- arbitrary external URL from AI web search, can't be pre-registered with next/image
+                        <img
+                          src={item.imageUrl}
+                          alt=""
+                          className="w-16 h-16 rounded-xl object-cover flex-shrink-0 bg-slate-100"
+                          onError={(e) => {
+                            e.currentTarget.style.display = "none";
+                          }}
+                        />
+                      )}
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-center gap-2">
                           <span className={`inline-flex items-center gap-1 text-xs font-medium border rounded-full px-2.5 py-0.5 ${style.badge}`}>
@@ -173,7 +189,17 @@ export function ItineraryView({ tripId, itineraryDays, onChange, onAskAiToReplac
                           <p className="text-sm text-slate-600 mt-1 leading-relaxed">{item.description}</p>
                         )}
                         {item.location && (
-                          <p className="text-xs text-slate-400 mt-1.5">📍 {item.location}</p>
+                          <p className="text-xs text-slate-400 mt-1.5">
+                            📍 {item.location}{" "}
+                            <a
+                              href={googleMapsUrl(item)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-teal-600 hover:text-teal-800 underline"
+                            >
+                              {t("itinerary.viewOnMap")}
+                            </a>
+                          </p>
                         )}
                         {item.sourceNote && (
                           <p className="text-xs text-teal-700/70 mt-1 italic">✦ {item.sourceNote}</p>

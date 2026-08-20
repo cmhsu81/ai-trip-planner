@@ -14,7 +14,7 @@ function webSearchTool(maxUses: number): Anthropic.Messages.WebSearchTool2025030
 // call only needs a small budget left over for date-specific lookups (this
 // week's weather, an event landing on these exact dates, etc).
 const RESEARCH_SEARCH_BUDGET = 5; // one-time per destination, cached afterwards
-const ITINERARY_SEARCH_BUDGET = 2; // date-specific checks only; bulk research is cached
+const ITINERARY_SEARCH_BUDGET = 4; // date-specific checks, plus opportunistic per-item image lookups; bulk research is cached
 const CHAT_SEARCH_BUDGET = 3; // targeted lookups for a single requested change
 const QUICK_ANSWER_SEARCH_BUDGET = 1; // cached research covers most of these; only truly time-specific questions need a live search
 
@@ -46,7 +46,8 @@ const ITINERARY_JSON_SHAPE = `{
           "description": string,
           "location": string,
           "estimatedDuration": string, // e.g. "1.5 hours"
-          "sourceNote": string  // brief note on why recommended / what source informed it (e.g. "highly rated on Google Maps & TripAdvisor", "featured in 2025 travel news")
+          "sourceNote": string,  // brief note on why recommended / what source informed it (e.g. "highly rated on Google Maps & TripAdvisor", "featured in 2025 travel news")
+          "imageUrl": string | null  // a direct image URL (ending in .jpg/.jpeg/.png/.webp) of this specific place, taken from a web_search result if one is available; null if none was found — never invent one
         }
       ]
     }
@@ -61,7 +62,7 @@ Pre-researched notes about this destination (attractions, restaurants, customs, 
 ${researchContext}
 """
 
-You also have a web_search tool with a small remaining budget — use it ONLY for things the notes above can't cover: the weather forecast or events landing specifically within the traveler's exact travel dates. Don't re-research general attractions/restaurants that are already covered in the notes.
+You also have a web_search tool with a small remaining budget — use it ONLY for things the notes above can't cover: the weather forecast or events landing specifically within the traveler's exact travel dates, and finding a real photo URL for an item ("imageUrl") when a search you already ran surfaces one. Don't spend searches hunting for images alone, and don't re-research general attractions/restaurants that are already covered in the notes — leave "imageUrl" null for items where no photo turned up.
 
 Use the notes and any date-specific search results to ground your recommendations in current, real information rather than guessing. Judge feasibility: flag anything unrealistic (too many stops in one day, conflicting travel times, seasonal closures, extreme weather, arriving/leaving too late/early for planned activities) inside "feasibilityNotes".
 
@@ -278,7 +279,7 @@ ${params.researchContext}
 
 First decide whether the user's message is:
 (a) a QUESTION — they just want information (e.g. "what's good to eat at XXX", "how's the weather in March") — answer it in "reply" and set "isChangeRequest" to false. Do NOT include "updatedItinerary".
-(b) a CHANGE REQUEST — they want you to modify the itinerary (delete/replace/extend/reorder/add an item). Use web_search sparingly, only for something specific the notes above don't cover. Set "isChangeRequest" to true, put a short explanation of the proposed change in "reply", and include the FULL updated itinerary in "updatedItinerary" (this is only a proposal — it will not be applied unless the user confirms it).
+(b) a CHANGE REQUEST — they want you to modify the itinerary (delete/replace/extend/reorder/add an item). Use web_search sparingly, only for something specific the notes above don't cover (including finding an "imageUrl" for a newly added item). Set "isChangeRequest" to true, put a short explanation of the proposed change in "reply", and include the FULL updated itinerary in "updatedItinerary" (this is only a proposal — it will not be applied unless the user confirms it). Carry over each unchanged item's existing "imageUrl" as-is; only look up a new one for items you added or replaced.
 
 Respond with ONLY a single JSON object (no markdown fences) of this shape:
 {

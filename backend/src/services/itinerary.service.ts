@@ -31,6 +31,7 @@ export async function replaceTripItinerary(tripId: string, draft: ItineraryDraft
             location: item.location,
             estimatedDuration: item.estimatedDuration,
             sourceNote: item.sourceNote,
+            imageUrl: item.imageUrl,
           },
         });
       }
@@ -69,6 +70,7 @@ export function tripToDraft(
         location: item.location ?? undefined,
         estimatedDuration: item.estimatedDuration ?? undefined,
         sourceNote: item.sourceNote ?? undefined,
+        imageUrl: item.imageUrl ?? undefined,
       })),
     })),
   };
