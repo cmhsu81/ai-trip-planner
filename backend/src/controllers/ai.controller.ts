@@ -12,6 +12,7 @@ import {
 } from "../services/anthropic.service";
 import { getTripWithItinerary, replaceTripItinerary, tripToDraft } from "../services/itinerary.service";
 import { getDestinationResearch } from "../services/destinationResearch.service";
+import { enrichAttractionImages } from "../services/wikimediaImage.service";
 
 const localeSchema = z.enum(["en", "zh"]).default("zh");
 
@@ -37,7 +38,8 @@ export async function generate(req: AuthRequest, res: Response, next: NextFuncti
     const input = generateSchema.parse(req.body);
 
     const researchContext = await getDestinationResearch(input.destination, input.locale);
-    const draft = await generateItinerary({ ...input, researchContext });
+    const rawDraft = await generateItinerary({ ...input, researchContext });
+    const draft = await enrichAttractionImages(rawDraft);
 
     const trip = await prisma.trip.create({
       data: {
@@ -99,11 +101,15 @@ export async function chat(req: AuthRequest, res: Response, next: NextFunction) 
       data: { tripId, role: "assistant", content: result.reply },
     });
 
+    const proposedItinerary = result.updatedItinerary
+      ? await enrichAttractionImages(result.updatedItinerary)
+      : null;
+
     res.json({
       messageId: savedReply.id,
       reply: result.reply,
       isChangeRequest: result.isChangeRequest,
-      proposedItinerary: result.updatedItinerary ?? null,
+      proposedItinerary,
     });
   } catch (err) {
     next(err);
