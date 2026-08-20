@@ -3,6 +3,7 @@
 import { FormEvent, useEffect, useState } from "react";
 import { useLocale } from "@/contexts/LocaleContext";
 import { DisplayChatMessage } from "@/types";
+import { MarkdownText } from "./MarkdownText";
 
 interface Props {
   messages: DisplayChatMessage[];
@@ -70,7 +71,7 @@ export function ChatPanel({ messages, onSend, onAccept, onReject, pendingMessage
                     : "bg-slate-100 text-slate-800 rounded-2xl rounded-bl-sm"
                 }`}
               >
-                {m.content}
+                {m.role === "assistant" ? <MarkdownText content={m.content} /> : m.content}
               </div>
               {m.role === "assistant" && m.isChangeRequest && (
                 <div className="mt-1.5 ml-0.5">

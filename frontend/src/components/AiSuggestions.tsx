@@ -5,6 +5,7 @@ import { useLocale } from "@/contexts/LocaleContext";
 import { api } from "@/lib/api";
 import { QuickSuggestion } from "@/types";
 import { Modal } from "./Modal";
+import { MarkdownText } from "./MarkdownText";
 
 interface Props {
   destination: string;
@@ -110,11 +111,13 @@ export function AiSuggestions({ destination, days }: Props) {
 
       {activeSuggestion && (
         <Modal title={activeSuggestion.label} onClose={() => setActiveSuggestion(null)}>
-          {!activeAnswer || activeAnswer.status === "loading"
-            ? t("common.loading")
-            : activeAnswer.status === "error"
-              ? t("aiSuggestions.error")
-              : activeAnswer.answer}
+          {!activeAnswer || activeAnswer.status === "loading" ? (
+            t("common.loading")
+          ) : activeAnswer.status === "error" ? (
+            t("aiSuggestions.error")
+          ) : (
+            <MarkdownText content={activeAnswer.answer} />
+          )}
         </Modal>
       )}
     </div>

@@ -30,7 +30,7 @@ export function Modal({ title, icon = "💡", onClose, children }: Props) {
             &times;
           </button>
         </div>
-        <div className="p-5 text-sm text-slate-700 leading-relaxed whitespace-pre-wrap">{children}</div>
+        <div className="p-5 text-sm text-slate-700 leading-relaxed">{children}</div>
       </div>
     </div>
   );
