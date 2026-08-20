@@ -178,7 +178,8 @@ const quickAnswerSchema = z.object({
 export async function quickAnswerHandler(req: AuthRequest, res: Response, next: NextFunction) {
   try {
     const { destination, days, question, locale } = quickAnswerSchema.parse(req.body);
-    const answer = await quickAnswer(destination, days, question, locale);
+    const researchContext = await getDestinationResearch(destination, locale);
+    const answer = await quickAnswer(destination, days, question, locale, researchContext);
     res.json({ answer });
   } catch (err) {
     next(err);

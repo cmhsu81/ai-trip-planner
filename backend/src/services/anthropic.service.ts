@@ -16,7 +16,7 @@ function webSearchTool(maxUses: number): Anthropic.Messages.WebSearchTool2025030
 const RESEARCH_SEARCH_BUDGET = 5; // one-time per destination, cached afterwards
 const ITINERARY_SEARCH_BUDGET = 2; // date-specific checks only; bulk research is cached
 const CHAT_SEARCH_BUDGET = 3; // targeted lookups for a single requested change
-const QUICK_ANSWER_SEARCH_BUDGET = 3; // answering one focused question
+const QUICK_ANSWER_SEARCH_BUDGET = 1; // cached research covers most of these; only truly time-specific questions need a live search
 
 type Tools = Anthropic.MessageCreateParamsNonStreaming["tools"];
 
@@ -385,14 +385,22 @@ export async function quickAnswer(
   destination: string,
   days: number,
   question: string,
-  locale: Locale
+  locale: Locale,
+  researchContext: string
 ): Promise<string> {
-  const system = `You are a helpful travel research assistant. Use web_search to answer the user's question about their destination with current, accurate information. Keep the answer concise (a short paragraph or a short bullet list). ${languageInstruction(
+  const system = `You are a helpful travel research assistant.
+
+Pre-researched notes about this destination — answer directly from these if they cover the question:
+"""
+${researchContext}
+"""
+
+You also have a web_search tool with a small remaining budget — use it ONLY if the notes above don't cover the question, or the question needs something time-specific the notes can't (e.g. this week's weather, a currently-running event). Keep the answer concise (a short paragraph or a short bullet list). ${languageInstruction(
     locale
   )}`;
 
   const response = await client.messages.create({
-    model: env.anthropicModel,
+    model: env.anthropicFastModel,
     max_tokens: 1200,
     system,
     tools: [webSearchTool(QUICK_ANSWER_SEARCH_BUDGET)],
