@@ -7,8 +7,9 @@ A full-stack web app that plans trips with AI. Tell it a destination, your trave
 - **AI-generated itineraries** — full day-by-day plans built from destination, trip length, arrival/departure date & time, interests, must-see attractions/restaurants, travel style, and budget (set via a slider, not free text)
 - **Grounded in real, current information** — Claude uses the `web_search` tool to pull in current attractions/restaurant reviews, news from the last 1–2 years, and weather, and flags feasibility concerns (unrealistic pacing, seasonal closures, conflicting travel times) instead of just guessing
 - **Direct editing** — check off, delete, or edit any itinerary item (time, duration, description) without regenerating the whole plan
+- **Photos and map links per item** — each itinerary item can carry a photo sourced from web search and a one-click "view on Google Maps" link
 - **Conversational refinement with a confirm step** — ask questions or request changes in plain language; the AI first classifies whether you're asking a question or requesting a change, and any actual change is shown as a proposal you approve or reject before it's applied — no silent edits
-- **AI-suggested interest tags and quick-question prompts** — destination-aware suggestions so you're not starting from a blank text box
+- **AI-suggested interest tags and quick-question prompts** — destination- and date-aware suggestions (e.g. seasonal activities that actually fall within your travel dates) so you're not starting from a blank text box
 - **Trip history** — a "My Trips" page to revisit and manage past plans
 - **English / Chinese UI**, including AI-generated content (summaries, feasibility notes, chat replies)
 
