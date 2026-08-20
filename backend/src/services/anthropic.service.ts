@@ -314,14 +314,39 @@ ${languageInstruction(params.locale)}`;
   };
 }
 
-export async function suggestInterests(destination: string, locale: Locale): Promise<string[]> {
-  const system = `You suggest short trip-interest tags for a travel planner UI. Given a destination, respond with ONLY a JSON array of 5 to 10 short strings (2-4 words each) naming popular activity/interest categories specifically relevant to that destination (e.g. for a place with mountains: "hiking", "hot spring", "national park"; for a coastal city: "seafood", "beaches", "diving"). No markdown fences, no commentary. ${languageInstruction(
-    locale
-  )}`;
+export interface SuggestInterestsTravelDates {
+  arrivalDate?: string;
+  departureDate?: string;
+}
+
+function describeTravelDates({ arrivalDate, departureDate }: SuggestInterestsTravelDates): string | undefined {
+  if (!arrivalDate && !departureDate) return undefined;
+  const parts: string[] = [];
+  if (arrivalDate) parts.push(`arriving ${arrivalDate}`);
+  if (departureDate) parts.push(`departing ${departureDate}`);
+  return `Travel dates: ${parts.join(", ")}.`;
+}
+
+export async function suggestInterests(
+  destination: string,
+  locale: Locale,
+  travelDates: SuggestInterestsTravelDates = {}
+): Promise<string[]> {
+  const dateContext = describeTravelDates(travelDates);
+
+  const system = `You suggest short trip-interest tags for a travel planner UI. Given a destination${
+    dateContext ? " and travel dates" : ""
+  }, respond with ONLY a JSON array of 5 to 10 short strings (2-4 words each) naming popular activity/interest categories specifically relevant to that destination (e.g. for a place with mountains: "hiking", "hot spring", "national park"; for a coastal city: "seafood", "beaches", "diving").${
+    dateContext
+      ? " Only include season-specific activities (e.g. cherry blossoms, fall foliage, skiing, whale watching) if they'd actually be in season on the given travel dates — leave them out entirely rather than suggesting something the traveler can't actually do on this trip."
+      : ""
+  } No markdown fences, no commentary. ${languageInstruction(locale)}`;
+
+  const userContent = dateContext ? `Destination: ${destination}\n${dateContext}` : `Destination: ${destination}`;
 
   const parsed = await createJsonMessage(
     system,
-    [{ role: "user", content: `Destination: ${destination}` }],
+    [{ role: "user", content: userContent }],
     500,
     (text) => extractJsonArray(text),
     { model: env.anthropicFastModel }

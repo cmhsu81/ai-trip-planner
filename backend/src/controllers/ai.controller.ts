@@ -136,13 +136,15 @@ export async function chatApply(req: AuthRequest, res: Response, next: NextFunct
 
 const suggestInterestsSchema = z.object({
   destination: z.string().min(1),
+  arrivalDate: z.string().optional(),
+  departureDate: z.string().optional(),
   locale: localeSchema,
 });
 
 export async function suggestInterestsHandler(req: AuthRequest, res: Response, next: NextFunction) {
   try {
-    const { destination, locale } = suggestInterestsSchema.parse(req.body);
-    const suggestions = await suggestInterests(destination, locale);
+    const { destination, arrivalDate, departureDate, locale } = suggestInterestsSchema.parse(req.body);
+    const suggestions = await suggestInterests(destination, locale, { arrivalDate, departureDate });
     res.json({ suggestions });
   } catch (err) {
     next(err);

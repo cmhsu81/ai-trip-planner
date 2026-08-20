@@ -102,10 +102,16 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
       try {
         const data = await api.post<{ suggestions: string[] }>("/ai/suggest-interests", {
           destination: trimmed,
+          arrivalDate: arrivalDate || undefined,
+          departureDate: departureDate || undefined,
           locale,
         });
         setSuggestedInterests(data.suggestions);
-        setSelectedInterests([]);
+        // Keep any selections that are still offered (e.g. a date-only
+        // change that just narrows the list); drop ones that fell out of
+        // it — otherwise a stale pick like "cherry blossoms" could still
+        // get submitted even after it disappears from the visible tags.
+        setSelectedInterests((prev) => prev.filter((i) => data.suggestions.includes(i)));
       } catch {
         setSuggestedInterests([]);
         setInterestsError(true);
@@ -114,7 +120,7 @@ export function PlannerForm({ onSubmit, submitting, onDestinationChange, onDaysC
       }
     }, 600);
     return () => clearTimeout(handle);
-  }, [destination, locale]);
+  }, [destination, arrivalDate, departureDate, locale]);
 
   function toggleInterest(interest: string) {
     setSelectedInterests((prev) =>
